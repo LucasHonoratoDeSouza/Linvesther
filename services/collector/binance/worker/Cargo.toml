@@ -14,7 +14,7 @@ collector-credentials = { path = "../../credentials" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "io-std"] }
 tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
-hmac = "0.12"
+hmac = "0.13"
 sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "macros", "migrate", "uuid", "chrono", "rust_decimal"] }
 uuid = { version = "1", features = ["v4"] }
