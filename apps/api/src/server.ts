@@ -21,8 +21,11 @@ import { buildApp, type AppOptions } from "./app.js";
 import { createPool } from "./storage/pool.js";
 import { credentialStore, useCredentialStore } from "./auth/identitySignature.js";
 import { PostgresCredentialStore, PostgresWebAuthnCredentialStore } from "./auth/credentialStore.js";
+import { PostgresNonceStore } from "./auth/nonceStore.js";
+import { PostgresRateLimiter, type RateLimit } from "./auth/rateLimiter.js";
+import { useVaultNonceStore } from "./auth/vault.js";
 import { MemorySessionStore, PostgresSessionStore, type SessionStore } from "./auth/sessionStore.js";
-import { useWebAuthnCredentialStore } from "./auth/webauthn.js";
+import { useWebAuthnCredentialStore, useWebAuthnNonceStores } from "./auth/webauthn.js";
 import { MemoryDisclosureStore, PostgresDisclosureStore, type DisclosureStore } from "./claims/store.js";
 import { MemoryPublicTrackStore } from "./public/store.js";
 import { MemorySettingsStore, PostgresSettingsStore, type SettingsStore } from "./profile/store.js";
@@ -62,7 +65,7 @@ async function loadChainLifecycle(): Promise<AppOptions["chainLifecycle"]> {
   await runMigrations(pool);
 
   const relayerAccount = privateKeyToAccount(relayerPrivateKey);
-  const relayer = new Relayer(new ViemBroadcastClient(rpcUrl, relayerPrivateKey), new MemoryRelayStore());
+  const relayer = new Relayer(new ViemBroadcastClient(rpcUrl, relayerPrivateKey), new MemoryRelayStore(), undefined, BigInt(process.env.RELAYER_MIN_BALANCE_WEI ?? "1000000000000"));
   const publicClient = createPublicClient({ transport: http(rpcUrl) });
   const projectionStore = new PostgresProjectionStore(pool, publicClient, [identityRegistry, accountRegistry]);
 
@@ -115,6 +118,8 @@ if (process.env.DEMO_SEED === "1") {
 let sessionStore: SessionStore = new MemorySessionStore();
 let disclosureStore: DisclosureStore = new MemoryDisclosureStore();
 let profileSettingsStore: SettingsStore = new MemorySettingsStore();
+let limiterFactory: ((name: string, max: number, windowMs: number) => RateLimit) | undefined;
+let proofRateLimiter: RateLimit | undefined;
 if (process.env.DATABASE_URL) {
   const pool = createPool(process.env.DATABASE_URL);
   const sessions = new PostgresSessionStore(pool);
@@ -123,6 +128,15 @@ if (process.env.DATABASE_URL) {
   const disclosures = new PostgresDisclosureStore(pool);
   const settings = new PostgresSettingsStore(pool);
   await Promise.all([sessions.ensureSchema(), credentials.ensureSchema(), passkeys.ensureSchema(), disclosures.ensureSchema(), settings.ensureSchema()]);
+  // Challenges and traffic limits are shared too, so several instances behave
+  // as one and a restart forgets nothing.
+  const nonces = { vault: new PostgresNonceStore(pool, "vault"), registration: new PostgresNonceStore(pool, "webauthn-registration"), authentication: new PostgresNonceStore(pool, "webauthn-authentication") };
+  await Promise.all([nonces.vault.ensureSchema(), nonces.registration.ensureSchema(), nonces.authentication.ensureSchema()]);
+  useVaultNonceStore(nonces.vault);
+  useWebAuthnNonceStores({ registration: nonces.registration, authentication: nonces.authentication });
+  await new PostgresRateLimiter(pool, "schema", 1, 1).ensureSchema();
+  limiterFactory = (name, max, windowMs) => new PostgresRateLimiter(pool, name, max, windowMs);
+  proofRateLimiter = limiterFactory("proof", 3, 10 * 60_000);
   useCredentialStore(credentials);
   useWebAuthnCredentialStore(passkeys);
   sessionStore = sessions;
@@ -135,7 +149,7 @@ if (process.env.DATABASE_URL) {
 // Loaded after the credential store is chosen, since it captures that store.
 const chainLifecycle = await loadChainLifecycle();
 
-const app = buildApp({ domain, trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 0), limitMultiplier: process.env.TRAFFIC_LIMIT_MULTIPLIER ? Number(process.env.TRAFFIC_LIMIT_MULTIPLIER) : undefined, relayBudgetPerHour: process.env.RELAY_MAX_PER_HOUR ? Number(process.env.RELAY_MAX_PER_HOUR) : undefined, publicTrackStore, sessionStore, disclosureStore, secureCookies: (process.env.WEBAUTHN_ORIGIN ?? "").startsWith("https://"), corsOrigins, chainLifecycle, binanceWorkerBinaryPath, profileSettingsStore });
+const app = buildApp({ domain, trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 0), limiterFactory, proofRateLimiter, limitMultiplier: process.env.TRAFFIC_LIMIT_MULTIPLIER ? Number(process.env.TRAFFIC_LIMIT_MULTIPLIER) : undefined, relayBudgetPerHour: process.env.RELAY_MAX_PER_HOUR ? Number(process.env.RELAY_MAX_PER_HOUR) : undefined, publicTrackStore, sessionStore, disclosureStore, secureCookies: (process.env.WEBAUTHN_ORIGIN ?? "").startsWith("https://"), corsOrigins, chainLifecycle, binanceWorkerBinaryPath, profileSettingsStore });
 
 if (chainLifecycle) {
   // Keeps the indexer's local view continuously close to the chain tip,

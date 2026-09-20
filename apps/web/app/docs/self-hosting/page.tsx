@@ -112,8 +112,9 @@ pnpm --filter @linvestherzk/web dev`}
         <p>
           All of this needs <code>DATABASE_URL</code>. Without it the API starts
           anyway, warns, and keeps sign-ins, identities and claims in memory, so
-          they are lost when it restarts. Sign-in challenges are always in
-          memory, so run a single API instance.
+          they are lost when it restarts. Sign-in challenges, traffic limits and the gas
+          budget are shared in Postgres too, so several API instances behave as one; without a database they are per
+          process, so run a single instance.
         </p>
       </section>
 

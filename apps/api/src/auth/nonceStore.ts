@@ -1,11 +1,12 @@
 import { randomBytes } from "node:crypto";
+import type { Pool } from "pg";
 
 export interface NonceStore {
-  issue(): string;
+  issue(): string | Promise<string>;
   /** Consumes `nonce` if it was issued, is still fresh and was not already
    * used. Returns whether the consume succeeded — `false` means the nonce
    * never existed, expired, or was already used (a replay). */
-  consume(nonce: string): boolean;
+  consume(nonce: string): boolean | Promise<boolean>;
 }
 
 /** A sign-in challenge is only worth answering for a few minutes. */
@@ -51,5 +52,58 @@ export class MemoryNonceStore implements NonceStore {
     for (const [nonce, expiresAt] of this.issued) {
       if (expiresAt <= now) this.issued.delete(nonce);
     }
+  }
+}
+
+/** Challenges kept in the database, so one issued by an API instance can be
+ * answered at another (or after a restart), and still only once. */
+export class PostgresNonceStore implements NonceStore {
+  constructor(
+    private readonly pool: Pool,
+    private readonly purpose: string,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  async ensureSchema(): Promise<void> {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS api_nonces (
+        nonce TEXT PRIMARY KEY,
+        purpose TEXT NOT NULL,
+        expires_at BIGINT NOT NULL
+      )`);
+    await this.pool.query(
+      "CREATE INDEX IF NOT EXISTS api_nonces_expiry ON api_nonces (purpose, expires_at)",
+    );
+  }
+
+  async issue(): Promise<string> {
+    const nonce = randomBytes(32).toString("base64url");
+    const now = this.now();
+    await this.pool.query(
+      "INSERT INTO api_nonces (nonce, purpose, expires_at) VALUES ($1, $2, $3)",
+      [nonce, this.purpose, now + NONCE_TTL_MS],
+    );
+    // Expired challenges are dead weight; and the table has the same bound as
+    // the in-memory store, dropping the oldest when asked for too many.
+    await this.pool.query(
+      "DELETE FROM api_nonces WHERE purpose = $1 AND expires_at <= $2",
+      [this.purpose, now],
+    );
+    await this.pool.query(
+      `DELETE FROM api_nonces WHERE purpose = $1 AND nonce IN (
+         SELECT nonce FROM api_nonces WHERE purpose = $1 ORDER BY expires_at DESC OFFSET $2)`,
+      [this.purpose, NONCE_CAPACITY],
+    );
+    return nonce;
+  }
+
+  async consume(nonce: string): Promise<boolean> {
+    // Deleting is what makes it single-use, even with two instances asking at once.
+    const result = await this.pool.query<{ expires_at: string }>(
+      "DELETE FROM api_nonces WHERE nonce = $1 AND purpose = $2 RETURNING expires_at",
+      [nonce, this.purpose],
+    );
+    const row = result.rows[0];
+    return row !== undefined && Number(row.expires_at) > this.now();
   }
 }

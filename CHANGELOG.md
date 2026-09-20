@@ -44,6 +44,13 @@ All notable changes are recorded here. The format follows
 
 ### Added
 
+- Sign-in challenges, per-client traffic limits and the gas budget are kept in
+  Postgres when `DATABASE_URL` is set, so several API instances behave as one and a
+  restart forgets nothing. The in-memory versions remain for tests and single
+  instances.
+- The relayer refuses to broadcast below a balance floor (`RELAYER_MIN_BALANCE_WEI`),
+  and the API answers 503 `relayer_underfunded` instead of failing mid-transaction.
+
 - Remove a connected account from Portfolio: the stored credential and everything
   collected for it are deleted, and it stops counting in the public profile.
 - A sound button on the landing page video, which autoplays muted; people who ask for

@@ -10,6 +10,13 @@ export function registerErrorHandler(app: FastifyInstance): void {
     if (status >= 400 && status < 500) {
       return reply.code(status).send({ error: error.code ? String(error.code).toLowerCase() : "bad_request" });
     }
+    // A server-side condition the person can be told about (for example the
+    // relayer being out of funds) carries its own stable code.
+    const publicCode = (error as { publicCode?: unknown }).publicCode;
+    if (typeof publicCode === "string" && status >= 500 && status < 600) {
+      console.error(error.message);
+      return reply.code(status).send({ error: publicCode });
+    }
     request.log.error(error);
     console.error(error);
     return reply.code(500).send({ error: "internal_error" });

@@ -13,7 +13,7 @@ import type {
 } from "@simplewebauthn/server";
 import Fastify, { type FastifyInstance } from "fastify";
 import { concat, getAddress, keccak256, slice } from "viem";
-import { RateLimiter } from "./auth/rateLimiter.js";
+import { RateLimiter, type RateLimit } from "./auth/rateLimiter.js";
 import { registerErrorHandler } from "./security/errors.js";
 import { registerResponseHeaders } from "./security/responseHeaders.js";
 import { registerTrafficLimits } from "./security/trafficLimits.js";
@@ -58,7 +58,7 @@ export interface AppOptions {
   corsOrigins?: string[];
   sessionStore?: SessionStore;
   /** Caps how often one session can start a real proof (CPU/RAM-heavy). */
-  proofRateLimiter?: RateLimiter;
+  proofRateLimiter?: RateLimit;
   /** Where a claim is checked against the owner's current figures. Defaults to the combined record read from the connected accounts. */
   currentClaimMetrics?: ClaimsRouteOptions["currentMetrics"];
   /** Marks the session cookie `Secure` — set whenever the API is served over HTTPS. */
@@ -69,6 +69,8 @@ export interface AppOptions {
   trustProxyHops?: number;
   /** Gas-paying actions the operator will fund per hour across all clients. */
   relayBudgetPerHour?: number;
+  /** Where traffic-limit counts live: in memory unless a shared store is given. */
+  limiterFactory?: (name: string, max: number, windowMs: number) => RateLimit;
   /** Scales every traffic limit. For a test environment only; leave unset in production. */
   limitMultiplier?: number;
   /** accountId -> the only address allowed to read it. */
@@ -313,7 +315,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
   });
 
   app.post("/auth/vault/challenge", async () => ({
-    challenge: beginChallenge(),
+    challenge: await beginChallenge(),
   }));
 
   app.post<{

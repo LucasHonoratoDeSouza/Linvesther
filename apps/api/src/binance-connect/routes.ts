@@ -1,5 +1,5 @@
 import { boundedString, boundedStrings } from "../security/input.js";
-import type { RateLimiter } from "../auth/rateLimiter.js";
+import type { RateLimit } from "../auth/rateLimiter.js";
 import type { FastifyInstance } from "fastify";
 import { requireSession } from "../auth/requireSession.js";
 import type { SessionStore } from "../auth/sessionStore.js";
@@ -12,7 +12,7 @@ export interface BinanceConnectRouteOptions {
   /** accountId -> the only address allowed to connect/read this account's exchange link. */
   accountOwners: Map<string, `0x${string}`>;
   /** Real proving is CPU/RAM-heavy, so one session can only start it so often. */
-  proofRateLimiter?: RateLimiter;
+  proofRateLimiter?: RateLimit;
   now?: () => Date;
   /** Called once an account is removed, so anything cached about it is dropped. */
   onAccountRemoved?: (ownerAddress: `0x${string}`, accountId: string) => void;
@@ -372,7 +372,7 @@ export function registerBinanceConnectRoutes(app: FastifyInstance, options: Bina
       return reply.code(403).send({ error: "cross_account_access_denied" });
     }
 
-    if (options.proofRateLimiter && !options.proofRateLimiter.allow(session.address.toLowerCase(), (options.now?.() ?? new Date()).getTime())) {
+    if (options.proofRateLimiter && !(await options.proofRateLimiter.allow(session.address.toLowerCase(), (options.now?.() ?? new Date()).getTime()))) {
       return reply.code(429).send({ error: "rate_limited" });
     }
 

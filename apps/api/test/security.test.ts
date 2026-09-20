@@ -166,6 +166,18 @@ describe("what a client is told", () => {
     await app.close();
   });
 
+  it("reports a condition it has a stable code for, without its message", async () => {
+    const app = buildApp({ domain: "localhost" });
+    app.get("/short", async () => {
+      throw Object.assign(new Error("balance 123 wei below 456 wei"), { publicCode: "relayer_underfunded", statusCode: 503 });
+    });
+    await app.ready();
+    const response = await app.inject({ method: "GET", url: "/short" });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: "relayer_underfunded" });
+    await app.close();
+  });
+
   it("keeps a client mistake as a client error", async () => {
     const { app } = await appWithSession();
     const response = await app.inject({ method: "POST", url: "/auth/vault/verify", headers: { "content-type": "application/json" }, payload: "{not json" });
