@@ -20,7 +20,7 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@simplewebauthn/server": "14.0.2",
-    "@types/node": "26.6.0",
+    "@types/node": "26.6.1",
     "@types/pg": "8.23.1",
     "tsx": "^4.23.13",
     "typescript": "7.0.2",
