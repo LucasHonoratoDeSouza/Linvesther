@@ -1,0 +1,15 @@
+[package]
+name = "zkvm-methods-statistics"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[build-dependencies]
+risc0-build = { version = "^3.0.6" }
+
+[dependencies]
+risc0-zkvm = { version = "^3.0.6" }
+serde = { version = "1", features = ["derive"] }
+
+[package.metadata.risc0]
+methods = ["guest"]

@@ -1,0 +1,128 @@
+/* A published track, as anyone sees it — the same card is used for the
+   public page and for the "what others will see" preview when sharing. */
+
+.trackCard {
+  padding: 26px;
+  margin-bottom: 18px;
+  background: #1c1e1c;
+  border: 1px solid #2c302a;
+  border-radius: 20px;
+}
+.trackHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.trackName {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+  color: #e6e9e0;
+  margin: 0 0 6px;
+}
+.trackMeta {
+  font-size: 11px;
+  color: #858e7d;
+}
+.badge {
+  display: inline-flex;
+  padding: 5px 10px;
+  border: 1px solid #373a34;
+  color: #b7c6a6;
+  font-size: 9px;
+  border-radius: 20px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.tile {
+  background: #131513;
+  border: 1px solid #2c302a;
+  border-radius: 14px;
+  padding: 16px;
+}
+.tileLabel {
+  font-size: 10px;
+  color: #858e7d;
+  margin-bottom: 9px;
+}
+.tileValue {
+  font-size: 26px;
+  letter-spacing: -0.5px;
+  color: #e6e9e0;
+}
+.tileSub {
+  margin-top: 8px;
+  font-size: 9px;
+  color: #7a8570;
+}
+.up {
+  color: #8fd46a;
+}
+.down {
+  color: #ff9c94;
+}
+.trackFoot {
+  margin: 18px 0 0;
+  font-size: 10.5px;
+  line-height: 1.7;
+  color: #7a8570;
+}
+
+.profileHead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #24301d;
+  color: #d0edaa;
+  font-size: 18px;
+}
+.profileTitle {
+  margin: 0 0 6px;
+  font-size: clamp(22px, 2.6vw, 30px);
+  letter-spacing: -0.04em;
+  color: #e6e9e0;
+}
+.address {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #a1aa96;
+}
+.copy {
+  background: transparent;
+  border: 1px solid #373a34;
+  border-radius: 20px;
+  padding: 3px 10px;
+  color: #b7c6a6;
+  font-size: 10px;
+  cursor: pointer;
+}
+.copy:hover {
+  color: #f0f3ec;
+}
+.explain {
+  margin-top: 28px;
+  padding: 22px;
+  border: 1px dashed #373a34;
+  border-radius: 20px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #949a8d;
+}
+.explain strong {
+  color: #c7d0bd;
+}

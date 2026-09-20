@@ -1,0 +1,17 @@
+[workspace]
+# Self-contained: detaches this experiment from the repository root
+# workspace so it keeps its own dependency resolution and lockfile.
+
+[package]
+name = "binance-conformance"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "1"

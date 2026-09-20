@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+# Self-contained workspace (see experiments/*): services/ is not a member
+# of the root Cargo workspace, so it keeps its own dependency resolution
+# and lockfile, matching the spec's directory layout
+# (services/collector, services/compute, services/chain-worker) as a
+# distinct deployable boundary from crates/.
+members = [
+    "collector/credentials",
+    "collector/exchange-core",
+    "collector/binance/catalog",
+    "collector/binance/trades",
+    "collector/binance/flows",
+    "collector/binance/prices",
+    "compute/jobs",
+    "collector/attestation",
+    "collector/tlsn",
+    "local-agent",
+    "collector/binance/live-client",
+    "collector/binance/worker",
+    "collector/coinbase/client",
+    "collector/ibkr/client",
+]
+
+[workspace.package]
+edition = "2021"

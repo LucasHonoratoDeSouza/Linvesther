@@ -1,0 +1,25 @@
+[package]
+name = "verifier"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "linvesther-verify"
+path = "src/bin/cli.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "1"
+bincode = "1.3"
+risc0-zkvm = "^3.0.6"
+clap = { version = "4", features = ["derive"] }
+commitments = { path = "../commitments" }
+checkpoint = { path = "../domain/checkpoint" }
+zkvm-methods = { path = "../../zkvm/methods/performance" }
+
+[dev-dependencies]
+k256 = { version = "0.13", features = ["ecdsa"] }

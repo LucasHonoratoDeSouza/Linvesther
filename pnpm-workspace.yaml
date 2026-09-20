@@ -1,0 +1,20 @@
+# Populated starting with apps/api and packages/protocol (the TS
+# codecs). Empty patterns are valid for pnpm (unlike a Cargo workspace
+# glob), so this can be committed ahead of any package existing.
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "services/chain-worker"
+  - "tests/e2e"
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@types/node@26.6.0'
+  - '@vitest/mocker@5.0.1'
+  - '@vitest/spy@5.0.1'
+  - vitest@5.0.1
+
+# Patched versions of transitive dependencies (see pnpm audit).
+overrides:
+  ws: ">=8.21.0"
+  postcss: ">=8.5.23"

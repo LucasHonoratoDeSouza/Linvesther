@@ -1,0 +1,22 @@
+{
+  "name": "@linvestherzk/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "canonicalize": "5.0.0",
+    "jsonc-parser": "3.3.1"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "5.0.1",
+    "@types/node": "26.6.0"
+  }
+}

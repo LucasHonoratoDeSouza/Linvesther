@@ -1,0 +1,10 @@
+{
+  "accountFactory": "0x31b565911Db40865B279E28f3f9A11FF84def40E",
+  "accountRegistry": "0xCCd02127b75b2D025FCbb86d254977d5949034a0",
+  "chainId": 84532,
+  "deployBlock": 46986337,
+  "identityRegistry": "0x4a24Ce35Fc8050600921Ff722FeE47bEd4963a99",
+  "p256VaultAccountImplementation": "0xB19c09b422f4Df92174C8E5Fa7E31b3BDe0BB28b",
+  "webAuthnAccountImplementation": "0x163b896041DF358bE6cfB9caDAec9C9AB5FfC6b9",
+  "profileRegistry": "0xc7030f8b1Af00da36A2616a55dA69ECeDd2fc1AE"
+}

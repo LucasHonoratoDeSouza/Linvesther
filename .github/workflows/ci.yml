@@ -1,0 +1,173 @@
+name: ci
+
+# The jobs below run the Makefile gates. None of them needs secrets: the
+# Binance bootstrap check runs against fixtures only.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+      - run: make contracts-deps
+      - run: make check-build
+
+  bootstrap-binance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: make bootstrap-binance
+
+  bootstrap-zk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: install RISC Zero toolchain
+        run: |
+          curl -L https://risczero.com/install -o /tmp/rzup-install.sh
+          bash /tmp/rzup-install.sh
+          echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
+      - run: "$HOME/.risc0/bin/rzup install"
+      # Reduced scale for CI turnaround; the real 10k-event/3-rep
+      # measurement is a one-time benchmark recorded in
+      # experiments/risc0-benchmark/report.md, not a per-commit CI cost.
+      - run: make -C experiments/risc0-benchmark check BENCH_EVENTS=50 BENCH_REPS=1
+
+  rust:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: make check-rust
+
+  contracts:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+      - run: make contracts-deps
+      - run: make check-contracts
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: build
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: linvestherzk
+          POSTGRES_PASSWORD: linvestherzk-local-dev-only
+          POSTGRES_DB: linvestherzk
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U linvestherzk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+          cache: pnpm
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+      - run: make contracts-deps
+      - run: forge build --root contracts
+      - run: pnpm install --frozen-lockfile
+      - run: make check-integration
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: build
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: linvestherzk
+          POSTGRES_PASSWORD: linvestherzk-local-dev-only
+          POSTGRES_DB: linvestherzk
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U linvestherzk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+          cache: pnpm
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+      - run: make contracts-deps
+      - run: forge build --root contracts
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter e2e-tests exec playwright install --with-deps chromium
+      - run: make check-e2e
+
+  zk:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: install RISC Zero toolchain
+        run: |
+          curl -L https://risczero.com/install -o /tmp/rzup-install.sh
+          bash /tmp/rzup-install.sh
+          echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
+      - run: "$HOME/.risc0/bin/rzup install"
+      - run: make check-zk
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-audit
+      # Known-vulnerable dependencies fail the build. Accepted Rust advisories
+      # are listed, with reasons, in .cargo/audit.toml.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod
+      - run: cargo audit
+      - run: cd services && cargo audit

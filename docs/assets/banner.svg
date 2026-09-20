@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340" role="img" aria-label="Linvesther">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="0%" r="70%">
+      <stop offset="0" stop-color="#d0edaa" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#d0edaa" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="340" rx="20" fill="#0b0d0c"/>
+  <rect width="1280" height="340" rx="20" fill="url(#glow)"/>
+  <rect x="0.5" y="0.5" width="1279" height="339" rx="19.5" fill="none" stroke="#2a2e29"/>
+  <g transform="translate(410 74) scale(0.72)">
+    <g fill="none" stroke="#d8ff91" stroke-width="18" stroke-linejoin="round">
+      <path d="M96,92 C80,92 59,91 36,90" stroke-linecap="round"/>
+      <path d="M96,92 C111,84 130,68 146,62" stroke-linecap="round"/>
+      <path d="M96,92 C82,82 70,62 57,51 C50,45 43,43 36,44"/>
+      <path d="M96,92 C82,102 70,121 57,131 C50,137 43,139 35,136"/>
+    </g>
+    <g fill="#d8ff91"><circle cx="36" cy="44" r="9"/><circle cx="35" cy="136" r="9"/><circle cx="96" cy="92" r="9"/></g>
+  </g>
+  <text x="568" y="163" font-family="Manrope, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="66" font-weight="600" letter-spacing="-2.5" fill="#d8ff91">linvesther</text>
+  <text x="640" y="238" text-anchor="middle" font-family="Manrope, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="26" fill="#f1f2eb">Your performance. <tspan fill="#8b9388">Proven. Privately.</tspan></text>
+  <text x="640" y="280" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="14" letter-spacing="2.5" fill="#8b9388">VERIFIABLE TRACK RECORDS · PERCENTAGES ONLY · OPEN SOURCE</text>
+</svg>

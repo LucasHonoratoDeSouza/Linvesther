@@ -1,0 +1,105 @@
+export const metadata = { title: "Connect an account" };
+
+export default function Connections() {
+  return (
+    <>
+      <span className="eyebrow">Start</span>
+      <h1>Connect an account</h1>
+      <p className="document-lead">
+        Every connection is read-only. Linvesther reads your history to compute
+        percentages; it cannot trade, withdraw or move anything.
+      </p>
+      <div className="document-notice">
+        Credentials that carry trading, transfer or withdrawal permissions are
+        rejected when you connect. Create a dedicated read-only key for
+        Linvesther and delete it whenever you like.
+      </div>
+
+      <section>
+        <h2>Binance</h2>
+        <ol>
+          <li>
+            In Binance, open Account, then API Management, then Create API.
+          </li>
+          <li>
+            Turn on <strong>Enable Reading</strong> only.
+          </li>
+          <li>Copy the API key and the secret into Linvesther.</li>
+        </ol>
+        <p>Spot accounts are supported. Updates arrive within moments.</p>
+      </section>
+
+      <section>
+        <h2>Coinbase</h2>
+        <ol>
+          <li>
+            Open the Coinbase Developer Platform (
+            <code>portal.cdp.coinbase.com</code>), then API keys, then Create
+            API key.
+          </li>
+          <li>
+            Give it the <strong>View</strong> permission only. Ed25519 and ECDSA
+            keys both work.
+          </li>
+          <li>
+            Copy the key ID (or name) and the secret. Coinbase shows the secret
+            once.
+          </li>
+        </ol>
+        <p>
+          Advanced Trade accounts are supported. Updates arrive within moments.
+        </p>
+      </section>
+
+      <section>
+        <h2>Interactive Brokers</h2>
+        <ol>
+          <li>
+            In Account Management, go to Settings, then Reporting, then Flex
+            Queries. Create an <strong>Activity Flex Query</strong> with the
+            Cash Transactions, Trades and Equity Summary sections, a daily
+            period and XML output.
+          </li>
+          <li>
+            Under Flex Web Service, generate a token. It is read-only. If you
+            restrict it by IP address, the report may be refused, so leave that
+            open or allow the server address.
+          </li>
+          <li>Copy the Flex Query ID and the token into Linvesther.</li>
+        </ol>
+        <p>
+          Interactive Brokers reports once a day, so figures update daily rather
+          than continuously.
+        </p>
+      </section>
+
+      <section>
+        <h2>Several accounts</h2>
+        <p>
+          You can connect any combination. They are added together into one
+          public record, and you cannot leave one out. Moving money between your
+          own accounts does not count as a gain. Give each account a name with
+          the pencil icon in Portfolio.
+        </p>
+      </section>
+
+      <section>
+        <h2>If a connection fails</h2>
+        <ul>
+          <li>
+            <strong>Refused because of permissions.</strong> The key can trade
+            or withdraw. Create a new key with reading only.
+          </li>
+          <li>
+            <strong>Access denied.</strong> The key or token is wrong, expired
+            or restricted by IP address.
+          </li>
+          <li>
+            <strong>Not enough history.</strong> Some figures appear only after
+            enough days. Connect, then check back.
+          </li>
+        </ul>
+      </section>
+    </>
+  );
+}

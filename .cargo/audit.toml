@@ -1,0 +1,13 @@
+# Advisories accepted after review. Anything not listed here fails the audit.
+[advisories]
+ignore = [
+  # `rsa` (Marvin timing attack) is pulled in only by the RISC Zero toolchain
+  # installer (`rzup`, a build-time tool). The project performs no RSA
+  # operation, and nothing that handles network input reaches it. No fixed
+  # version exists. Revisit when RISC Zero drops or updates the dependency.
+  "RUSTSEC-2023-0071",
+  # `tracing-subscriber` 0.2 (ANSI escapes in logs) comes from `ark-relations`
+  # inside RISC Zero's Groth16 prover. Our own logging does not use it, and the
+  # prover never logs request data. Revisit on a RISC Zero upgrade.
+  "RUSTSEC-2025-0055",
+]

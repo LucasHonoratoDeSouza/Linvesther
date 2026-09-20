@@ -1,0 +1,78 @@
+# Local development infrastructure, per
+# the operations design: "Local: Docker Compose
+# + PostgreSQL + storage S3 compatível + Anvil; fixtures, nunca
+# credenciais reais na CI."
+#
+# This file is authored but not exercised by this repository's own
+# gates (bringing containers up would run against this machine's real
+# resource budget, not a hermetic test); `infra/recovery`'s own suite
+# covers the restore/retention/mirror/purge-gate *logic* independently
+# of whether these specific containers are running.
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      # The default is for a throwaway local database only. For anything that
+      # holds real data, set POSTGRES_PASSWORD (`docker compose --env-file .env`).
+      POSTGRES_USER: linvestherzk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-linvestherzk-local-dev-only}
+      POSTGRES_DB: linvestherzk
+    ports:
+      # Bound to this machine only: the password below is public, so the
+      # database must never be reachable from the network.
+      # Host-side port intentionally non-default: 5432 collides with
+      # other local Postgres instances on a dev machine often enough
+      # that this project's own DATABASE_URL should never assume 5432.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      # postgres:18+ images store data under a major-version-specific
+      # subdirectory of this mount point, not directly at
+      # /var/lib/postgresql/data — see
+      # https://github.com/docker-library/postgres/pull/1259.
+      - postgres-data:/var/lib/postgresql
+
+  # S3-compatible object storage for private/public blob separation.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: linvestherzk
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-linvestherzk-local-dev-only}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio-data:/data
+
+  # Local EVM devnet for the registry contracts and chain-worker suites
+  # (the same tool `services/chain-worker`'s real integration tests use).
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: ["anvil", "--host", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:8545:8545"
+
+  # Background sync for every connected Binance account (follow-up:
+  # see services/collector/binance/worker/README.md). Not started by
+  # `docker compose up` without naming it explicitly — it needs a real
+  # BINANCE_WORKER_ENCRYPTION_KEY from the host environment, and
+  # accounts only get synced once someone has actually connected one
+  # via apps/api/src/binance-connect.
+  binance-worker:
+    build:
+      context: ../services
+      dockerfile: collector/binance/worker/Dockerfile
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://linvestherzk:${POSTGRES_PASSWORD:-linvestherzk-local-dev-only}@postgres:5432/linvestherzk
+      # Never hardcoded here — must come from the host's own
+      # environment (see services/collector/binance/worker/README.md
+      # for how to generate one). Compose fails to start the service
+      # rather than run with an empty/default key.
+      BINANCE_WORKER_ENCRYPTION_KEY: ${BINANCE_WORKER_ENCRYPTION_KEY:?set BINANCE_WORKER_ENCRYPTION_KEY in the host environment before starting this service}
+
+volumes:
+  postgres-data:
+  minio-data:

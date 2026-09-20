@@ -1,0 +1,11 @@
+[package]
+name = "collector-attestation"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+sha2 = "0.10"
+k256 = { version = "0.13", features = ["ecdsa"] }
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }

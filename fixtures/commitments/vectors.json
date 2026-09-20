@@ -1,0 +1,99 @@
+{
+  "suite": "LZK-JCS-SHA256-v1",
+  "description": "Cross-language conformance vectors for canonical JSON, the H(tag, fields...) framing hash, data commitments and the Merkle tree defined in the protocol specification. Both the Rust (crates/commitments) and TypeScript (packages/protocol) implementations must reproduce every hex value here exactly.",
+  "canonical": {
+    "input": {
+      "b": 2,
+      "a": 1,
+      "note": "héllo"
+    },
+    "expectedBytesUtf8": "{\"a\":1,\"b\":2,\"note\":\"héllo\"}"
+  },
+  "frameHash": {
+    "tag": "LZK/test/v1",
+    "fieldsUtf8": [
+      "abc",
+      "xyz"
+    ],
+    "expectedHex": "63b678bcf08d17c73b2c378b4dba56ea05c4718a752d62b9ce8784228eccfde6"
+  },
+  "dataCommitment": {
+    "data": {
+      "b": 2,
+      "a": 1,
+      "note": "héllo"
+    },
+    "cases": [
+      {
+        "name": "baseline",
+        "saltHex": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expectedHex": "2a07ecb52897d0c922d4801d8029b8abbae4da9fd3d430630ecab63818f810f5"
+      },
+      {
+        "name": "salt_changed",
+        "saltHex": "2222222222222222222222222222222222222222222222222222222222222222",
+        "expectedHex": "a8bfabff936e6634c12f4c72a8c8f1e2b4313569f1e98bab7678a166fb4c9bc5"
+      }
+    ],
+    "fieldChangedCase": {
+      "data": {
+        "b": 3,
+        "a": 1,
+        "note": "héllo"
+      },
+      "saltHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "expectedHex": "453d8a7db32cb22909839d013018817aeaaa682c59a030a8ca816fc42cc46d09"
+    }
+  },
+  "merkle": {
+    "leafRecords": [
+      {
+        "i": 0
+      },
+      {
+        "i": 1
+      },
+      {
+        "i": 2
+      },
+      {
+        "i": 3
+      },
+      {
+        "i": 4
+      }
+    ],
+    "leafSaltsHex": [
+      "0000000000000000000000000000000000000000000000000000000000000000",
+      "0101010101010101010101010101010101010101010101010101010101010101",
+      "0202020202020202020202020202020202020202020202020202020202020202",
+      "0303030303030303030303030303030303030303030303030303030303030303",
+      "0404040404040404040404040404040404040404040404040404040404040404"
+    ],
+    "expectedLeafHashesHex": [
+      "a289bf2320df0d6c9177b6f457dfb1d5b3e9cb0046eb55e96979975c4690c845",
+      "cb09d99559090508c2e8672af4bf8d199fe8be25a176db2f6599dfd7f4a7de41",
+      "8143a698e65488c118d4a46e75a9da9dd4298dfb2c62bd045cb8d6743f4fdd76",
+      "7d305408d320c6637ae5e14c91e3ab00385b57af1ed4384f2c831601a9c93c78",
+      "c8edb30cd97c186514335489b2c9f17e9729c2c7f38b5eb6b11180f9c9ffe5ff"
+    ],
+    "expectedRootHex": "8b7963ea2d4afb08c9d59252ed76fab4072c40afd741c458899004676efcb0b9",
+    "expectedHeight": 3,
+    "inclusionProof": {
+      "index": 2,
+      "count": 5,
+      "expectedSiblingsHex": [
+        "7d305408d320c6637ae5e14c91e3ab00385b57af1ed4384f2c831601a9c93c78",
+        "8723b2e501d7ab6a77fd6f35498cdcc5058b4ae5b21206e7b6ccb9f0d3a48b94",
+        "7d74d74095a1968dcafd8838137392fc770d08fc370dcf54ce872d139dd69dc2"
+      ]
+    },
+    "emptyTree": {
+      "expectedRootHex": "6e97a762e0fd260417bd9958f1e9f9306cc064260e2a8c57b965064f3a17dcac"
+    },
+    "singleLeafTree": {
+      "expectedRootHex": "b9cd095d01140adf92744a882aac67193e21ecfac00932b6639743727f295c50",
+      "expectedHeight": 0
+    }
+  }
+}

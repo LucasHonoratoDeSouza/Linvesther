@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+target
+services/target
+apps/*/dist
+.next
+apps/web/.next
+.git
+.env
+.env.*
+!.env.example
+rules
+.specs
+.agent-work
+AGENTS.md
+**/*.pem
+**/*.key

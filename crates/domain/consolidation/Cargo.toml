@@ -1,0 +1,12 @@
+[package]
+name = "consolidation"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+rust_decimal = "1"
+thiserror = "1"
+
+[dev-dependencies]
+returns = { path = "../returns" }

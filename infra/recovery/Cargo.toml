@@ -1,0 +1,14 @@
+[package]
+name = "recovery"
+version = "0.1.0"
+edition = "2021"
+
+# Standalone workspace: infra/ is a distinct deployable/operational
+# boundary (like services/ and experiments/*), not part of the root
+# Cargo workspace's dependency graph.
+[workspace]
+
+[dependencies]
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "1"

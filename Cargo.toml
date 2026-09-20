@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+# Members are added explicitly as each crate is delivered (a glob errors
+# when it matches nothing, which was the case before this one). Experiments
+# under experiments/ are self-contained workspaces (each declares its own
+# [workspace]) and are intentionally not members here.
+members = [
+    "crates/commitments",
+    "crates/domain/ledger",
+    "crates/domain/valuation",
+    "crates/domain/returns",
+    "crates/domain/metrics",
+    "crates/domain/consolidation",
+    "crates/domain/checkpoint",
+    "crates/domain/corrections",
+    "zkvm/methods/performance",
+    "crates/verifier",
+    "zkvm/methods/tls-origin",
+    "zkvm/methods/statistics",
+]
+
+[workspace.package]
+edition = "2021"

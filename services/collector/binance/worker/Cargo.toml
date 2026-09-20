@@ -1,0 +1,55 @@
+[package]
+name = "binance-worker"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+binance-live-client = { path = "../live-client" }
+binance-trades = { path = "../trades" }
+binance-catalog = { path = "../catalog" }
+binance-flows = { path = "../flows" }
+binance-prices = { path = "../prices" }
+collector-credentials = { path = "../../credentials" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "io-std"] }
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+hmac = "0.12"
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "macros", "migrate", "uuid", "chrono", "rust_decimal"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+aes-gcm = "0.11"
+getrandom = "0.2"
+hex = "0.4"
+zeroize = { version = "1", features = ["derive"] }
+ledger = { path = "../../../../crates/domain/ledger" }
+valuation = { path = "../../../../crates/domain/valuation" }
+returns = { path = "../../../../crates/domain/returns" }
+metrics = { path = "../../../../crates/domain/metrics" }
+rust_decimal = "1"
+exchange-core = { path = "../../exchange-core" }
+coinbase-client = { path = "../../coinbase/client" }
+ibkr-client = { path = "../../ibkr/client" }
+collector-attestation = { path = "../../attestation", optional = true }
+commitments = { path = "../../../../crates/commitments", optional = true }
+zkvm-methods = { path = "../../../../zkvm/methods/performance", optional = true }
+risc0-zkvm = { version = "^3.0.6", optional = true }
+k256 = { version = "0.13", features = ["ecdsa"], optional = true }
+bincode = { version = "1.3", optional = true }
+
+[dev-dependencies]
+rust_decimal_macros = "1"
+
+# "proving" pulls in RISC Zero (a whole second Rust toolchain the guest
+# program compiles under) — real, on-demand ZK proving of performance
+# claims, but heavy enough that a lightweight deployment (no `rzup`
+# toolchain available, e.g. most container builds) needs to build
+# without it. Default on so local dev/tests are unaffected; built with
+# `--no-default-features` where proving isn't needed.
+[features]
+default = ["proving"]
+proving = ["dep:collector-attestation", "dep:commitments", "dep:zkvm-methods", "dep:risc0-zkvm", "dep:k256", "dep:bincode"]

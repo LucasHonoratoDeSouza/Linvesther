@@ -1,0 +1,14 @@
+[package]
+name = "commitments"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_jcs = "0.2"
+sha2 = "0.10"
+getrandom = "0.2"
+hex = "0.4"
+thiserror = "1"
