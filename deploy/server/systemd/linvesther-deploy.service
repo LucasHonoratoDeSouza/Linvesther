@@ -1,0 +1,6 @@
+[Unit]
+Description=Deploy the latest Linvesther commit whose CI passed
+
+[Service]
+Type=oneshot
+ExecStart=%h/linvesther/repo/deploy/server/poll.sh

@@ -1,0 +1,13 @@
+[Unit]
+Description=Linvesther web
+
+[Service]
+WorkingDirectory=%h/linvesther/repo/apps/web
+EnvironmentFile=%h/linvesther/repo/deploy/server/settings.env
+Environment=PATH=%h/.local/opt/node-v24.18.0-linux-x64/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/linvesther/repo/deploy/server/run-web.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
