@@ -17,7 +17,7 @@
 //!
 //! **Not verified against a real account** — see `ibkr-client`'s own
 //! doc comment.
-use crate::crypto::{decrypt, EncryptedField, MasterKey};
+use crate::crypto::{credential_context, decrypt, EncryptedField, MasterKey};
 use crate::history::SeriesRange;
 use chrono::NaiveDate;
 use ibkr_client::{Credentials, IbkrClient};
@@ -45,8 +45,8 @@ pub struct IbkrConnection {
 pub fn credentials(key: &MasterKey, connection: &IbkrConnection) -> Result<Credentials, String> {
     let nonce_token: [u8; 12] = connection.nonce_token.clone().try_into().map_err(|_| "corrupt stored token")?;
     let nonce_query: [u8; 12] = connection.nonce_query_id.clone().try_into().map_err(|_| "corrupt stored query id")?;
-    let token = decrypt(key, &connection.encrypted_token, &nonce_token).map_err(|e| e.to_string())?;
-    let query_id = decrypt(key, &connection.encrypted_query_id, &nonce_query).map_err(|e| e.to_string())?;
+    let token = decrypt(key, &connection.encrypted_token, &nonce_token, &credential_context("ibkr", &connection.account_id, "token")).map_err(|e| e.to_string())?;
+    let query_id = decrypt(key, &connection.encrypted_query_id, &nonce_query, &credential_context("ibkr", &connection.account_id, "query_id")).map_err(|e| e.to_string())?;
     Credentials::new(&token, &query_id).map_err(|e| e.to_string())
 }
 

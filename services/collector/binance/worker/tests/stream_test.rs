@@ -34,11 +34,13 @@ async fn subscribing_to_the_real_account_stream_succeeds() {
         &binance_worker::crypto::encrypt(
             &binance_worker::crypto::MasterKey::from_hex(&"22".repeat(32)).unwrap(),
             "k",
+            "test",
         )
         .unwrap(),
         &binance_worker::crypto::encrypt(
             &binance_worker::crypto::MasterKey::from_hex(&"22".repeat(32)).unwrap(),
             "s",
+            "test",
         )
         .unwrap(),
         &[],

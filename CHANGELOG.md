@@ -8,6 +8,11 @@ All notable changes are recorded here. The format follows
 
 ### Security
 
+- Stored exchange credentials are now bound to their broker, account and field
+  (authenticated data), so a ciphertext copied to another row no longer
+  decrypts. The key can be rotated: the previous key stays readable, and the
+  worker's `rekey` re-encrypts everything (`credential-check` reports without
+  changing). Existing credentials keep working and are upgraded by `rekey`.
 - Errors from Interactive Brokers, Coinbase and Binance no longer repeat the
   request URL. That URL carried the Flex Web Service token (or a request
   signature) into messages shown to people and written to logs.

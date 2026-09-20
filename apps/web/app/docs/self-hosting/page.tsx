@@ -179,7 +179,11 @@ pnpm --filter @linvestherzk/web dev`}
             Keep <code>BINANCE_WORKER_ENCRYPTION_KEY</code> and{" "}
             <code>BINANCE_WORKER_A0_SIGNING_KEY</code> safe. The first protects
             stored credentials; losing the second changes your collector
-            identity.
+            identity. To rotate the encryption key, set the new one, keep the
+            old one in <code>BINANCE_WORKER_ENCRYPTION_KEY_PREVIOUS</code>{" "}
+            (comma-separated for several), run the worker&apos;s{" "}
+            <code>credential-check</code> to see what would change and{" "}
+            <code>rekey</code> to re-encrypt, then drop the old key.
           </li>
         </ul>
       </section>

@@ -50,8 +50,8 @@ async fn inserting_a_connection_and_finding_it_by_account_round_trips() {
     cleanup(&pool, account_id).await;
 
     let key = test_key();
-    let enc_key = encrypt(&key, "sk-test-key").unwrap();
-    let enc_secret = encrypt(&key, "sk-test-secret").unwrap();
+    let enc_key = encrypt(&key, "sk-test-key", "test").unwrap();
+    let enc_secret = encrypt(&key, "sk-test-secret", "test").unwrap();
     let symbols = vec!["BTCUSDT".to_string()];
 
     let id = db::insert_connection(&pool, account_id, &enc_key, &enc_secret, &symbols)
@@ -79,8 +79,8 @@ async fn connecting_the_same_account_twice_updates_rather_than_duplicates() {
     cleanup(&pool, account_id).await;
 
     let key = test_key();
-    let enc_key = encrypt(&key, "sk-1").unwrap();
-    let enc_secret = encrypt(&key, "sk-1-secret").unwrap();
+    let enc_key = encrypt(&key, "sk-1", "test").unwrap();
+    let enc_secret = encrypt(&key, "sk-1-secret", "test").unwrap();
     let first_id = db::insert_connection(
         &pool,
         account_id,
@@ -91,8 +91,8 @@ async fn connecting_the_same_account_twice_updates_rather_than_duplicates() {
     .await
     .unwrap();
 
-    let enc_key_2 = encrypt(&key, "sk-2").unwrap();
-    let enc_secret_2 = encrypt(&key, "sk-2-secret").unwrap();
+    let enc_key_2 = encrypt(&key, "sk-2", "test").unwrap();
+    let enc_secret_2 = encrypt(&key, "sk-2-secret", "test").unwrap();
     let second_id = db::insert_connection(
         &pool,
         account_id,
@@ -131,8 +131,8 @@ async fn upserting_the_same_trade_twice_does_not_duplicate_it() {
     let connection_id = db::insert_connection(
         &pool,
         account_id,
-        &encrypt(&key, "k").unwrap(),
-        &encrypt(&key, "s").unwrap(),
+        &encrypt(&key, "k", "test").unwrap(),
+        &encrypt(&key, "s", "test").unwrap(),
         &["BTCUSDT".to_string()],
     )
     .await
@@ -181,8 +181,8 @@ async fn a_trade_with_the_same_id_under_a_different_symbol_is_a_separate_row() {
     let connection_id = db::insert_connection(
         &pool,
         account_id,
-        &encrypt(&key, "k").unwrap(),
-        &encrypt(&key, "s").unwrap(),
+        &encrypt(&key, "k", "test").unwrap(),
+        &encrypt(&key, "s", "test").unwrap(),
         &["BTCUSDT".to_string(), "ETHUSDT".to_string()],
     )
     .await
@@ -233,8 +233,8 @@ async fn connection_summary_reflects_persisted_trades_and_flows() {
     let connection_id = db::insert_connection(
         &pool,
         account_id,
-        &encrypt(&key, "k").unwrap(),
-        &encrypt(&key, "s").unwrap(),
+        &encrypt(&key, "k", "test").unwrap(),
+        &encrypt(&key, "s", "test").unwrap(),
         &["BTCUSDT".to_string()],
     )
     .await
@@ -297,8 +297,8 @@ async fn a_freshly_connected_account_is_immediately_due_for_sync_and_a_just_sync
     let connection_id = db::insert_connection(
         &pool,
         account_id,
-        &encrypt(&key, "k").unwrap(),
-        &encrypt(&key, "s").unwrap(),
+        &encrypt(&key, "k", "test").unwrap(),
+        &encrypt(&key, "s", "test").unwrap(),
         &["BTCUSDT".to_string()],
     )
     .await
@@ -328,8 +328,8 @@ async fn deleting_a_connection_removes_its_credential_and_everything_collected()
     cleanup(&pool, account_id).await;
 
     let key = test_key();
-    let enc_key = encrypt(&key, "sk-test-key").unwrap();
-    let enc_secret = encrypt(&key, "sk-test-secret").unwrap();
+    let enc_key = encrypt(&key, "sk-test-key", "test").unwrap();
+    let enc_secret = encrypt(&key, "sk-test-secret", "test").unwrap();
     let id = db::insert_connection(&pool, account_id, &enc_key, &enc_secret, &[]).await.unwrap();
     let trade = Trade {
         symbol: "BTCUSDT".to_string(),
@@ -354,4 +354,48 @@ async fn deleting_a_connection_removes_its_credential_and_everything_collected()
         .unwrap();
     assert_eq!(left.0, 0, "the history collected for it goes with it");
     assert!(!db::delete_connection(&pool, id).await.unwrap(), "removing it again reports that nothing was there");
+}
+
+#[tokio::test]
+#[ignore = "requires a running local Postgres; see this file's doc comment."]
+async fn rekey_moves_credentials_to_the_new_key_and_leaves_unreadable_ones_alone() {
+    use binance_worker::crypto::{credential_context, decrypt};
+    use binance_worker::rekey;
+
+    let pool = pool().await;
+    let readable = "db-test-rekey-readable";
+    let foreign = "db-test-rekey-foreign";
+    cleanup(&pool, readable).await;
+    cleanup(&pool, foreign).await;
+
+    let old = MasterKey::from_hex(&"11".repeat(32)).unwrap();
+    let other = MasterKey::from_hex(&"33".repeat(32)).unwrap();
+    let ring = MasterKey::from_hex(&"22".repeat(32))
+        .unwrap()
+        .with_previous(&"11".repeat(32))
+        .unwrap();
+    let symbols = vec!["BTCUSDT".to_string()];
+    let ctx = |account: &str, field: &str| credential_context("binance", account, field);
+
+    let k = encrypt(&old, "the-key", &ctx(readable, "api_key")).unwrap();
+    let s = encrypt(&old, "the-secret", &ctx(readable, "api_secret")).unwrap();
+    db::insert_connection(&pool, readable, &k, &s, &symbols).await.unwrap();
+    let k = encrypt(&other, "x", &ctx(foreign, "api_key")).unwrap();
+    let s = encrypt(&other, "y", &ctx(foreign, "api_secret")).unwrap();
+    db::insert_connection(&pool, foreign, &k, &s, &symbols).await.unwrap();
+
+    let before = rekey::check(&pool, &ring).await.unwrap();
+    assert!(before.upgraded >= 1 && before.unreadable.contains(&foreign.to_string()));
+    let untouched = db::find_connection_by_account(&pool, readable).await.unwrap().unwrap();
+    assert!(decrypt(&old, &untouched.encrypted_api_key, &(untouched.nonce_api_key.as_slice().try_into().unwrap()), &ctx(readable, "api_key")).is_ok());
+
+    rekey::rekey(&pool, &ring).await.unwrap();
+    let moved = db::find_connection_by_account(&pool, readable).await.unwrap().unwrap();
+    let plain = decrypt(&ring, &moved.encrypted_api_secret, &(moved.nonce_api_secret.as_slice().try_into().unwrap()), &ctx(readable, "api_secret")).unwrap();
+    assert_eq!(plain, "the-secret");
+    let new_only = MasterKey::from_hex(&"22".repeat(32)).unwrap();
+    assert!(decrypt(&new_only, &moved.encrypted_api_key, &(moved.nonce_api_key.as_slice().try_into().unwrap()), &ctx(readable, "api_key")).is_ok());
+
+    cleanup(&pool, readable).await;
+    cleanup(&pool, foreign).await;
 }
