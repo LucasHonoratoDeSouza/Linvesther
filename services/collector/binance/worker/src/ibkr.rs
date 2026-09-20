@@ -74,6 +74,15 @@ pub async fn insert_connection(pool: &PgPool, account_id: &str, token: &Encrypte
     Ok(row.0)
 }
 
+/// Deletes the stored credential and, by cascade, everything collected for it.
+pub async fn delete_connection(pool: &PgPool, connection_id: Uuid) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM ibkr_connections WHERE id = $1")
+        .bind(connection_id)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
 pub async fn set_label(pool: &PgPool, connection_id: Uuid, label: &str) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE ibkr_connections SET label = $2 WHERE id = $1").bind(connection_id).bind(label).execute(pool).await?;
     Ok(())

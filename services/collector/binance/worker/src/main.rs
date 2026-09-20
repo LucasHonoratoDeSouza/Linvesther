@@ -529,6 +529,25 @@ async fn run_rename() -> Result<RenameResponse, String> {
     Ok(RenameResponse { label })
 }
 
+#[derive(Serialize)]
+struct DisconnectResponse {
+    removed: bool,
+    broker: &'static str,
+}
+
+/// Removes a connected account: its stored credential and, by cascade,
+/// everything collected for it. Nothing about it is kept.
+async fn run_disconnect() -> Result<DisconnectResponse, String> {
+    let request: StatusRequest = read_stdin_json()?;
+    let pool = pool().await?;
+    let (broker, removed) = match resolve(&pool, &request.account_id).await? {
+        Account::Binance(c) => ("binance", db::delete_connection(&pool, c.id).await),
+        Account::Coinbase(c) => ("coinbase", coinbase::delete_connection(&pool, c.id).await),
+        Account::Ibkr(c) => ("ibkr", ibkr::delete_connection(&pool, c.id).await),
+    };
+    Ok(DisconnectResponse { removed: removed.map_err(|e| e.to_string())?, broker })
+}
+
 async fn run_status() -> Result<db::ConnectionSummary, String> {
     let request: StatusRequest = read_stdin_json()?;
     let pool = pool().await?;
@@ -1024,6 +1043,7 @@ async fn main() {
         "status" => print_result(run_status().await),
         "list" => print_result(run_list().await),
         "rename" => print_result(run_rename().await),
+        "disconnect" => print_result(run_disconnect().await),
         "sync" => print_result(run_sync().await),
         "series" => print_result(run_series().await),
         "nav" => print_result(run_nav().await),

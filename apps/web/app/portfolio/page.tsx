@@ -21,6 +21,7 @@ import {
   beginVaultChallenge,
   checkSession,
   fetchAccounts,
+  removeAccount,
   renameAccount,
   fetchBinanceNav,
   fetchBinancePerformance,
@@ -253,6 +254,17 @@ function PortfolioContent() {
       return false;
     }
     setAccounts((current) => current?.map((a) => (a.accountId === accountId ? { ...a, label: result.data.label } : a)) ?? current);
+    return true;
+  }
+
+  async function remove(accountId: string): Promise<boolean> {
+    const result = await removeAccount(accountId);
+    if (!result.ok && result.status !== 404) {
+      setError(`Could not remove the account: ${result.error}`);
+      return false;
+    }
+    setAccounts((current) => current?.filter((a) => a.accountId !== accountId) ?? current);
+    setSelected((current) => (current === accountId ? "all" : current));
     return true;
   }
 
@@ -573,7 +585,7 @@ function PortfolioContent() {
                 loadingPerformance={Boolean(loadingPerf[selectedAccount.accountId])}
               />
             ) : (
-              <AllAccountsView accounts={accounts} navs={navs} perfs={perfs} onOpen={setSelected} onRename={rename} />
+              <AllAccountsView accounts={accounts} navs={navs} perfs={perfs} onOpen={setSelected} onRename={rename} onRemove={remove} />
             )}
 
             <p className={styles.note} style={{ textAlign: "center" }}>

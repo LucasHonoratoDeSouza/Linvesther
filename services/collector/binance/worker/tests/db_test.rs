@@ -319,3 +319,39 @@ async fn a_freshly_connected_account_is_immediately_due_for_sync_and_a_just_sync
 
     cleanup(&pool, account_id).await;
 }
+
+#[tokio::test]
+#[ignore = "requires a running local Postgres; see this file's doc comment."]
+async fn deleting_a_connection_removes_its_credential_and_everything_collected() {
+    let pool = pool().await;
+    let account_id = "db-test-delete";
+    cleanup(&pool, account_id).await;
+
+    let key = test_key();
+    let enc_key = encrypt(&key, "sk-test-key").unwrap();
+    let enc_secret = encrypt(&key, "sk-test-secret").unwrap();
+    let id = db::insert_connection(&pool, account_id, &enc_key, &enc_secret, &[]).await.unwrap();
+    let trade = Trade {
+        symbol: "BTCUSDT".to_string(),
+        id: 1,
+        order_id: 1,
+        price: "1".to_string(),
+        qty: "1".to_string(),
+        commission: "0".to_string(),
+        commission_asset: "BTC".to_string(),
+        time_ms: 1,
+        is_buyer: true,
+    };
+    db::upsert_trades(&pool, id, &[trade]).await.unwrap();
+
+    assert!(db::delete_connection(&pool, id).await.unwrap(), "an existing connection is removed");
+
+    assert!(db::find_connection_by_account(&pool, account_id).await.unwrap().is_none());
+    let left: (i64,) = sqlx::query_as("SELECT count(*) FROM binance_synced_trades WHERE connection_id = $1")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(left.0, 0, "the history collected for it goes with it");
+    assert!(!db::delete_connection(&pool, id).await.unwrap(), "removing it again reports that nothing was there");
+}

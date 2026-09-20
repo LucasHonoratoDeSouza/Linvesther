@@ -17,16 +17,20 @@ export function AllAccountsView({
   perfs,
   onOpen,
   onRename,
+  onRemove,
 }: {
   accounts: ConnectedAccount[];
   navs: Record<string, BinanceNav>;
   perfs: Record<string, BinancePerformance>;
   onOpen: (accountId: string) => void;
   onRename: (accountId: string, label: string) => Promise<boolean>;
+  onRemove: (accountId: string) => Promise<boolean>;
 }) {
   const { mask, tone } = usePrivacy();
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
 
   async function commit(accountId: string, current: string) {
     const wanted = draft.trim();
@@ -138,9 +142,50 @@ export function AllAccountsView({
                         <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
                       </svg>
                     </button>
+                    <button
+                      type="button"
+                      className={styles.pencil}
+                      aria-label="Remove account"
+                      data-testid="remove-account"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRemoving(account.accountId);
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="m6 6 1 14h10l1-14" />
+                      </svg>
+                    </button>
                   </div>
                 )}
-                <div className={styles.assetQty}>{brokerById(account.broker)?.name ?? account.broker} · connected {dateLabel(account.connectedAtMs)}</div>
+                {removing === account.accountId ? (
+                  <div className={styles.removeConfirm} onClick={(e) => e.stopPropagation()} data-testid="remove-confirm">
+                    Remove {accountName(account, index)}? This deletes the stored key and everything collected for it, and it stops counting in your public profile.
+                    <span className={styles.removeActions}>
+                      <button
+                        type="button"
+                        className={styles.btnPrimary}
+                        disabled={removeBusy}
+                        data-testid="remove-confirm-button"
+                        onClick={async () => {
+                          setRemoveBusy(true);
+                          const removed = await onRemove(account.accountId);
+                          setRemoveBusy(false);
+                          if (removed) setRemoving(null);
+                        }}
+                      >
+                        {removeBusy ? "Removing…" : "Remove"}
+                      </button>
+                      <button type="button" className={styles.btnSecondary} disabled={removeBusy} onClick={() => setRemoving(null)}>
+                        Cancel
+                      </button>
+                    </span>
+                  </div>
+                ) : (
+                  <div className={styles.assetQty}>{brokerById(account.broker)?.name ?? account.broker} · connected {dateLabel(account.connectedAtMs)}</div>
+                )}
               </div>
               <div className={styles.assetRight}>
                 <div className={styles.assetUsd}>{nav ? `${mask(money(nav.nav))} ${nav.currency}` : "…"}</div>

@@ -799,3 +799,15 @@
   padding: 4px 8px;
   font-size: 14px;
 }
+
+.removeConfirm {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d8b4a8;
+}
+.removeActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}

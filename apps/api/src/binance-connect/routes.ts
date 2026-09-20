@@ -14,6 +14,8 @@ export interface BinanceConnectRouteOptions {
   /** Real proving is CPU/RAM-heavy, so one session can only start it so often. */
   proofRateLimiter?: RateLimiter;
   now?: () => Date;
+  /** Called once an account is removed, so anything cached about it is dropped. */
+  onAccountRemoved?: (ownerAddress: `0x${string}`, accountId: string) => void;
   /** Path to the compiled `binance-worker` binary. */
   workerBinaryPath: string;
 }
@@ -116,6 +118,39 @@ export function registerBinanceConnectRoutes(app: FastifyInstance, options: Bina
     } catch (error) {
       if (error instanceof WorkerInvocationError) {
         return reply.code(422).send({ error: "coinbase_connection_failed", detail: error.message });
+      }
+      throw error;
+    }
+  });
+
+  // Removes a connected account: its stored credential and everything collected
+  // for it. What is already public is not a copy this service keeps, so it stops
+  // showing as soon as the cache lapses (the cache is dropped here).
+  app.delete<{ Params: { accountId: string } }>("/accounts/:accountId", async (request, reply) => {
+    const session = await requireSession(request, options.sessionStore);
+    if (!session) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+    if (!isOwner(options.accountOwners, request.params.accountId, session.address)) {
+      return reply.code(403).send({ error: "cross_account_access_denied" });
+    }
+    try {
+      const result = await invokeWorker<{ removed: boolean; broker: string }>(
+        { binaryPath: options.workerBinaryPath },
+        "disconnect",
+        JSON.stringify({ accountId: request.params.accountId }),
+      );
+      if (!result.removed) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      options.onAccountRemoved?.(session.address, request.params.accountId);
+      return { removed: true, broker: result.broker };
+    } catch (error) {
+      if (error instanceof WorkerInvocationError) {
+        if (error.message.startsWith("no connection for account")) {
+          return reply.code(404).send({ error: "not_found" });
+        }
+        return reply.code(502).send({ error: "remove_failed", detail: error.message });
       }
       throw error;
     }

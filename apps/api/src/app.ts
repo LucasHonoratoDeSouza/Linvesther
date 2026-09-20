@@ -192,19 +192,21 @@ export function buildApp(options: AppOptions): FastifyInstance {
     trackOwners: multiAccountTrackOwners,
     now,
   });
-  registerBinanceConnectRoutes(app, {
-    sessionStore,
-    accountOwners,
-    workerBinaryPath: binanceWorkerBinaryPath,
-    proofRateLimiter,
-    now,
-  });
   const profileSettings =
     options.profileSettingsStore ?? new MemorySettingsStore();
   const publicProfiles = new PublicProfileService({
     workerBinaryPath: binanceWorkerBinaryPath,
     settings: profileSettings,
     now,
+  });
+  registerBinanceConnectRoutes(app, {
+    sessionStore,
+    accountOwners,
+    workerBinaryPath: binanceWorkerBinaryPath,
+    proofRateLimiter,
+    now,
+    onAccountRemoved: (owner, accountId) =>
+      publicProfiles.forgetAccount(owner, accountId),
   });
   registerProfileRoutes(app, {
     sessionStore,

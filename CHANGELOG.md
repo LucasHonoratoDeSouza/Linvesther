@@ -44,6 +44,11 @@ All notable changes are recorded here. The format follows
 
 ### Added
 
+- Remove a connected account from Portfolio: the stored credential and everything
+  collected for it are deleted, and it stops counting in the public profile.
+- A sound button on the landing page video, which autoplays muted; people who ask for
+  reduced motion get a paused video with the browser's controls.
+
 - Proofs record which collector key signed the source data. The verifier
   classifies it against a list of trusted collectors (`trust/collectors.json`)
   as trusted, self-attested, revoked or outside its validity window, and does

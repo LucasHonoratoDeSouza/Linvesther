@@ -83,6 +83,15 @@ export default function Connections() {
         </p>
       </section>
 
+      <section id="remove">
+        <h2>Removing an account</h2>
+        <p>
+          In Portfolio, hover an account and use the bin icon. Removing an account deletes the stored key and everything
+          collected for it, and it stops counting in your public profile. Revoke the key at the exchange as well if you
+          no longer want it to exist there.
+        </p>
+      </section>
+
       <section>
         <h2>If a connection fails</h2>
         <ul>
