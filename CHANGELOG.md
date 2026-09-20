@@ -6,6 +6,13 @@ All notable changes are recorded here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `deploy/server`: production services (API, web, tunnel, Postgres) as user
+  `systemd` units and a pull-based deploy that ships a commit only after its CI
+  passed, keeps the previous build, and rolls back on a failed health check.
+- `GET /healthz` on the API, a liveness check with no side effects.
+
 ### Security
 
 - Stored exchange credentials are now bound to their broker, account and field

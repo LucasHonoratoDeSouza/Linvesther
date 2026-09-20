@@ -135,6 +135,20 @@ pnpm --filter @linvestherzk/web dev`}
       </section>
 
       <section>
+        <h2>Running it on a server</h2>
+        <p>
+          The <code>deploy/server</code> folder runs the whole stack as
+          per-user <code>systemd</code> services: Postgres in Docker, the API,
+          the web app and a Cloudflare tunnel, so nothing listens on a public
+          port. A timer checks the deploy branch every few minutes. It deploys
+          a commit only once every CI job for it has passed, builds beside the
+          running version, switches, and goes back to the previous commit if
+          the new services do not answer their health checks. The server pulls
+          the code; nothing outside can reach it and no secret is stored on
+          GitHub. Secrets live in one file outside the repository, readable
+          only by its owner.
+        </p>
+
         <h2>Beyond your machine</h2>
         <ul>
           <li>
