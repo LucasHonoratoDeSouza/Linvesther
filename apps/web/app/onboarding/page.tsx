@@ -345,7 +345,15 @@ export default function OnboardingPage() {
    * its WebAuthn assertion re-encoded into WebAuthnAccount's on-chain
    * wire format, which nothing in this codebase does yet. */
   async function handleConfirmIdentity() {
-    if (!identity || signedInMethod !== "vault" || !vaultPrivateKey) return;
+    if (!identity || signedInMethod !== "vault") return;
+    if (!vaultPrivateKey) {
+      // The key exists only in this page's memory, from the moment the password
+      // was entered. After a reload the session is still valid but the key is gone.
+      setError(
+        "To finish activating, sign in with your password again: it is never kept after you leave this page. Use “Not you? Sign out” above, then sign in with your password or backup file.",
+      );
+      return;
+    }
     setError(null);
     setConfirmBusy(true);
     try {

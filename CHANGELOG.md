@@ -14,6 +14,10 @@ All notable changes are recorded here. The format follows
   error. Those inserts now ignore a row that already exists, and overlapping
   syncs run one after another instead of walking the same blocks together.
 
+- "Activate my account" did nothing after the page was reloaded: the password's
+  key lives only in the page's memory, and the button returned without a word
+  when it was gone. It now says to sign in with the password again.
+
 ### Changed
 
 - `www.` and plain-http requests are redirected (308) to the canonical https
