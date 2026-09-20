@@ -23,7 +23,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 aes-gcm = "0.11"
-getrandom = "0.2"
+getrandom = "0.4"
 hex = "0.4"
 zeroize = { version = "1", features = ["derive"] }
 ledger = { path = "../../../../crates/domain/ledger" }

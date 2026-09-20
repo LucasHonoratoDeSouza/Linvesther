@@ -412,7 +412,7 @@ dependencies = [
  "commitments",
  "exchange-core",
  "futures-util",
- "getrandom 0.2.17",
+ "getrandom 0.4.3",
  "hex",
  "hmac",
  "ibkr-client",
@@ -697,7 +697,7 @@ dependencies = [
  "chrono",
  "ed25519-dalek",
  "exchange-core",
- "getrandom 0.2.17",
+ "getrandom 0.4.3",
  "p256",
  "reqwest",
  "rust_decimal",
@@ -721,7 +721,7 @@ name = "collector-credentials"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
- "getrandom 0.2.17",
+ "getrandom 0.4.3",
  "hex",
  "hmac",
  "serde",
