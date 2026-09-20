@@ -2388,25 +2388,6 @@ details[open] > summary > svg {
 .media-frame {
   position: relative;
 }
-.media-sound {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: #0b0d0ccc;
-  color: var(--text);
-  backdrop-filter: blur(6px);
-}
-.media-sound:hover,
-.media-sound:focus-visible {
-  border-color: var(--accent);
-  color: var(--accent);
-}
 .media-video {
   display: block;
   width: 100%;

@@ -6,6 +6,11 @@ All notable changes are recorded here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- The landing page walkthrough video no longer has a soundtrack, so its sound
+  button is gone.
+
 ### Added
 
 - `deploy/server`: production services (API, web, tunnel, Postgres) as user
