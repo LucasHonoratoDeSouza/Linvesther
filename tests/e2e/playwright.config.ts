@@ -9,6 +9,9 @@ import { ANVIL_PORT, API_PORT, DATABASE_URL, WEB_PORT, DEPLOYER_KEY, EXPECTED_AC
 // app.
 export default defineConfig({
   testDir: "./web",
+  // Only the browser specs. The other files in ./web are Vitest unit tests
+  // (*.e2e.test.ts), which Playwright must not try to run.
+  testMatch: /.*\.spec\.ts/,
   timeout: 30_000,
   fullyParallel: false,
   workers: 1,
