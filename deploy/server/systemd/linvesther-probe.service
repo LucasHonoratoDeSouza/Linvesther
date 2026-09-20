@@ -1,0 +1,6 @@
+[Unit]
+Description=Record a Linvesther health sample
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/linvesther/repo/deploy/server/probe.py

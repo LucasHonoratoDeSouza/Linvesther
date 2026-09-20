@@ -13,6 +13,11 @@ All notable changes are recorded here. The format follows
 
 ### Added
 
+- `deploy/server/probe.py` records a health sample every minute (public addresses
+  through the tunnel, services, database, tunnel request counters, machine load,
+  memory and disk), and `report.py` summarises availability, outages, reboots,
+  latency and traffic peaks.
+
 - `deploy/server`: production services (API, web, tunnel, Postgres) as user
   `systemd` units and a pull-based deploy that ships a commit only after its CI
   passed, keeps the previous build, and rolls back on a failed health check.

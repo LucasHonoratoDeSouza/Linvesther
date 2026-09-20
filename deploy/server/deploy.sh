@@ -50,6 +50,8 @@ rm -rf "apps/web/$next"
 (cd apps/web && NEXT_DIST_DIR="$next" pnpm exec next build)
 git checkout -- apps/web/tsconfig.json apps/web/next-env.d.ts 2>/dev/null || true
 
+# Pick up changed unit files (a changed tunnel unit takes effect at its next restart).
+"$REPO/deploy/server/install.sh" >/dev/null
 ln -sfn "$ROOT/releases/worker-$target" "$ROOT/current-worker"
 echo "$next" > "$ROOT/shared/dist-current"
 restart

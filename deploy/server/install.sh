@@ -5,4 +5,5 @@ here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$HOME/.config/systemd/user"
 cp "$here"/systemd/*.service "$here"/systemd/*.timer "$HOME/.config/systemd/user/"
 systemctl --user daemon-reload
-systemctl --user enable linvesther-api.service linvesther-web.service linvesther-tunnel.service linvesther-deploy.timer
+systemctl --user enable linvesther-api.service linvesther-web.service linvesther-tunnel.service
+systemctl --user enable --now linvesther-deploy.timer linvesther-probe.timer
