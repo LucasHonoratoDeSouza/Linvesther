@@ -8,7 +8,13 @@ import { Icon } from "./Icon";
 
 export const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL || "/docs";
 
-export function SiteHeader() {
+export function SiteHeader({
+  onAppHost = false,
+  websiteUrl = "/",
+}: {
+  onAppHost?: boolean;
+  websiteUrl?: string;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [protocolOpen, setProtocolOpen] = useState(false);
@@ -79,10 +85,7 @@ export function SiteHeader() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 6 }}
                 >
-                  <a
-                    href="/whitepaper"
-                    onClick={() => setProtocolOpen(false)}
-                  >
+                  <a href="/whitepaper" onClick={() => setProtocolOpen(false)}>
                     <Icon name="book" />
                     <span>
                       Whitepaper<small>The protocol, explained.</small>
@@ -106,9 +109,15 @@ export function SiteHeader() {
           </a>
         </nav>
         <div className="header-actions">
-          <a href="/portfolio" className="button button-small button-light">
-            Open app <Icon name="diagonal" width={14} />
-          </a>
+          {onAppHost ? (
+            <a href={websiteUrl} className="button button-small button-light">
+              Open website <Icon name="diagonal" width={14} />
+            </a>
+          ) : (
+            <a href="/portfolio" className="button button-small button-light">
+              Open app <Icon name="diagonal" width={14} />
+            </a>
+          )}
           <button
             className="icon-button mobile-menu-toggle"
             ref={mobileButton}
