@@ -22,4 +22,4 @@ checkpoint = { path = "../domain/checkpoint" }
 zkvm-methods = { path = "../../zkvm/methods/performance" }
 
 [dev-dependencies]
-k256 = { version = "0.13", features = ["ecdsa"] }
+k256 = { version = "0.14", features = ["ecdsa"] }

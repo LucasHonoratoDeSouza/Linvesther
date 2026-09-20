@@ -12,7 +12,7 @@ risc0-zkvm = { version = "^3.0.6" }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
-k256 = { version = "0.13", features = ["ecdsa"] }
+k256 = { version = "0.14", features = ["ecdsa"] }
 sha2 = "0.10"
 
 [package.metadata.risc0]
