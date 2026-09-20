@@ -12,7 +12,7 @@ serde_json = "1"
 thiserror = "1"
 p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
 base64 = "0.22"
-ed25519-dalek = "2"
+ed25519-dalek = "3"
 getrandom = "0.2"
 rust_decimal = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
