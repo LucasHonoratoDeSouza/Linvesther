@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DOC_PAGES } from "./nav";
 
-const GROUPS = ["Start", "Concepts", "Reference"] as const;
+const GROUPS = ["Start", "Concepts", "Guides", "Reference"] as const;
 
 export function DocsSidebar() {
   const pathname = usePathname();

@@ -15,6 +15,9 @@
 **Turn a real track record into public statements anyone can check.<br>
 No balance, no position, no trade is ever published.**
 
+Linvesther is an open-source protocol for privacy-preserving, verifiable
+investment track records.
+
 [Whitepaper](apps/web/public/linvesther-whitepaper.pdf) ·
 [Architecture](docs/architecture.md) ·
 [Contributing](CONTRIBUTING.md) ·

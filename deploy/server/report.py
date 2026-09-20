@@ -3,7 +3,7 @@
 
 Usage: report.py [--hours N]   (default 24)
 """
-import argparse, json
+import argparse, json, subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -102,6 +102,22 @@ def main():
             print(f"  peak hour {hour}: {int(n)}")
     else:
         print("  no data yet")
+
+    # Visits that named their source (?utm_source=...), logged by the web app.
+    journal = subprocess.run(
+        ["journalctl", "--user", "-u", "linvesther-web", "--since", since.strftime("%Y-%m-%d %H:%M:%S UTC"), "-o", "cat", "--no-pager"],
+        capture_output=True, text=True,
+    ).stdout
+    sources = {}
+    for line in journal.splitlines():
+        if line.startswith("{") and '"event":"utm"' in line:
+            try:
+                name = json.loads(line)["source"]
+            except (ValueError, KeyError):
+                continue
+            sources[name] = sources.get(name, 0) + 1
+    print("\nReferrals that named a source:")
+    print("  " + (", ".join(f"{k} {v}" for k, v in sorted(sources.items(), key=lambda kv: -kv[1])) or "none"))
 
     last = rows[-1]["machine"]
     print(f"\nMachine now: load {last['load1']:.2f}, {last['mem_available_mb']} MB free, disk {last['disk_used_pct']}%, up {last['uptime_s'] // 3600} h")

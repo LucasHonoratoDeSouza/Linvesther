@@ -53,6 +53,13 @@ export function middleware(request: NextRequest) {
     withPolicy(NextResponse.next({ request: { headers: requestHeaders } }));
 
   if (!ROOT_DOMAIN) return next();
+  // Referrals that name their source (ChatGPT search adds utm_source=chatgpt.com)
+  // are counted, with no address or other detail, so the deployment report can
+  // show where visitors come from.
+  const source = request.nextUrl.searchParams.get("utm_source");
+  if (source && /^[a-z0-9._-]{1,40}$/i.test(source)) {
+    console.log(JSON.stringify({ event: "utm", source: source.toLowerCase() }));
+  }
   // www and plain http are the same pages as the canonical address: send them
   // there permanently, files included, so nothing is indexed twice.
   const canonical = canonicalRedirect(

@@ -16,6 +16,16 @@ All notable changes are recorded here. The format follows
 
 ### Added
 
+- Four guides in the documentation (verifiable track records, zero-knowledge
+  performance, proving performance without revealing trades, and a comparison of
+  verification approaches), each with `TechArticle` structured data.
+- One-sentence definition of the project, used by the site metadata, `llms.txt`,
+  the README and the repository description.
+- `CITATION.cff` and `.zenodo.json`, so the project can be cited and archived
+  with a DOI.
+- Visits that carry `?utm_source=` (for example from ChatGPT search) are counted
+  and appear in the server report.
+
 - `deploy/server/probe.py` records a health sample every minute (public addresses
   through the tunnel, services, database, tunnel request counters, machine load,
   memory and disk), and `report.py` summarises availability, outages, reboots,

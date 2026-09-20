@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use Linvesther, please cite it as below."
+title: "Linvesther: privacy-preserving, verifiable investment track records"
+type: software
+abstract: >-
+  Linvesther is an open-source protocol for privacy-preserving, verifiable
+  investment track records. It turns a real track record into public claims
+  anyone can check, without publishing a balance, a position or a trade.
+authors:
+  - family-names: "Honorato de Souza"
+    given-names: "Lucas"
+repository-code: "https://github.com/LucasHonoratoDeSouza/Linvesther"
+url: "https://linvesther.com"
+license: Apache-2.0
+keywords:
+  - zero-knowledge proofs
+  - track record
+  - verifiable performance
+  - RISC Zero
+  - privacy

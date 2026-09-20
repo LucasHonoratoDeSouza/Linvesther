@@ -81,8 +81,14 @@ export function securityTxt(origin: string, now: Date): string {
   ].join("\n");
 }
 
+/** The one sentence that says what the project is. The site, the repository
+ * description and the documentation all open with it. */
+export const DEFINITION =
+  "Linvesther is an open-source protocol for privacy-preserving, verifiable investment track records.";
+
 const SUMMARY =
-  "Turn a real track record into public claims anyone can check, without publishing a balance, a position or a trade. " +
+  `${DEFINITION} ` +
+  "It turns a real track record into public claims anyone can check, without publishing a balance, a position or a trade. " +
   "Performance is measured from read-only exchange and broker connections and published as percentages only. " +
   "Signed claims and zero-knowledge proofs back the statements, and identities are recorded in a public registry on Base (currently the Sepolia test network).";
 
@@ -139,6 +145,25 @@ export function organizationJsonLd(origin: string): object[] {
       programmingLanguage: ["TypeScript", "Rust", "Solidity"],
     },
   ];
+}
+
+/** Structured data for a documentation page. */
+export function techArticleJsonLd(
+  origin: string,
+  page: { href: string; label: string; description?: string },
+): object {
+  return {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    headline: page.label,
+    ...(page.description ? { description: page.description } : {}),
+    url: `${origin}${page.href}`,
+    inLanguage: "en",
+    isPartOf: { "@type": "WebSite", name: "Linvesther documentation", url: `${origin}/docs` },
+    author: { "@type": "Organization", name: "Linvesther", url: REPOSITORY },
+    publisher: { "@type": "Organization", name: "Linvesther", url: REPOSITORY },
+    license: "https://www.apache.org/licenses/LICENSE-2.0",
+  };
 }
 
 /** JSON for a `<script type="application/ld+json">`, safe to place in HTML. */

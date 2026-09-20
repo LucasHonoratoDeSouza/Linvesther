@@ -5,7 +5,13 @@ import { Providers } from "../components/Providers";
 import { SiteHeader } from "../components/SiteHeader";
 import { hostContext } from "../lib/hostContext";
 import { requestSite } from "../lib/requestOrigin";
-import { jsonLdScript, organizationJsonLd } from "../lib/siteMeta";
+import { DOC_PAGES } from "./docs/nav";
+import {
+  DEFINITION,
+  jsonLdScript,
+  organizationJsonLd,
+  techArticleJsonLd,
+} from "../lib/siteMeta";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -23,8 +29,7 @@ const manrope = Manrope({
 });
 
 const TITLE = "Linvesther — Performance. Proven privately.";
-const DESCRIPTION =
-  "Turn your financial track record into verifiable claims. Explore performance, choose what to share, and keep your trading history private.";
+const DESCRIPTION = `${DEFINITION} Turn your financial track record into verifiable claims, choose what to share, and keep your trading history private.`;
 
 export async function generateMetadata(): Promise<Metadata> {
   const { origin, zone, pathname } = await requestSite();
@@ -78,6 +83,9 @@ export default async function RootLayout({
             }}
           />
         )}
+        {site.zone === "docs" && (
+          <DocsArticleJsonLd origin={site.origin} pathname={site.pathname} />
+        )}
         <Providers>
           <a className="skip-link" href="#main-content">
             Skip to content
@@ -91,3 +99,26 @@ export default async function RootLayout({
     </html>
   );
 }
+
+function DocsArticleJsonLd({
+  origin,
+  pathname,
+}: {
+  origin: string;
+  pathname: string;
+}) {
+  const page = (DOC_PAGES as readonly DocPage[]).find(
+    (entry) => entry.href === pathname,
+  );
+  if (!page) return null;
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: jsonLdScript(techArticleJsonLd(origin, page)),
+      }}
+    />
+  );
+}
+
+type DocPage = { href: string; label: string; description?: string };
