@@ -11,6 +11,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { createPublicClient, createWalletClient, http, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { Pool } from "pg";
+import { dropDatabase } from "./testDatabase.js";
 import {
   accountFactoryAbi,
   accountRegistryAbi,
@@ -20,6 +21,7 @@ import {
 import {
   ANVIL_PORT,
   DATABASE_URL,
+  E2E_DATABASE_NAME,
   DEPLOYER_KEY,
   EXPECTED_ACCOUNT_FACTORY,
   EXPECTED_ACCOUNT_REGISTRY,
@@ -83,12 +85,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     throw new Error(`AccountFactory deployed to ${accountFactory}, expected ${EXPECTED_ACCOUNT_FACTORY} — update chainFixtures.ts`);
   }
 
+  // This run's own database, created by prepareDatabase.ts before the API
+  // started: nothing here can touch data that already exists.
   const pool = new Pool({ connectionString: DATABASE_URL });
-  await pool.query("DROP TABLE IF EXISTS accounts, tracks, identities, indexed_blocks, schema_migrations CASCADE");
   await runMigrations(pool);
   await pool.end();
 
   return async () => {
     anvil.kill();
+    await dropDatabase(E2E_DATABASE_NAME);
   };
 }
