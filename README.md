@@ -106,8 +106,8 @@ and Docker for PostgreSQL. Proving needs the RISC Zero toolchain; build the work
 with `--no-default-features` to skip it.
 
 ```sh
-git clone --recurse-submodules <this repository>
-cd LinvestherZK
+git clone --recurse-submodules https://github.com/LucasHonoratoDeSouza/Linvesther.git
+cd Linvesther
 pnpm install
 infra/local/up.sh                # database, local chain, contracts and .env.local
 cargo build -p binance-worker --manifest-path services/Cargo.toml
