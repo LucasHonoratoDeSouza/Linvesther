@@ -166,6 +166,9 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       typescript:
         specifier: 7.0.2
         version: 7.0.2
