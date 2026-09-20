@@ -20,6 +20,9 @@ All notable changes are recorded here. The format follows
 
 ### Changed
 
+- The site declares 48, 96 and 192 pixel icons, the sizes search engines accept
+  for the icon next to a result (the existing ones were 16, 32 and 512).
+
 - `www.` and plain-http requests are redirected (308) to the canonical https
   address, so search engines do not index the same page twice.
 
