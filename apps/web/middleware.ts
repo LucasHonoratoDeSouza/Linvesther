@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy } from "./lib/contentSecurityPolicy";
+import { isStaticAsset } from "./lib/staticAssets";
 
 // Splits the landing page, the app (portfolio/explorer/disclose/…) and
 // the docs (whitepaper/docs) across three subdomains of the same
@@ -40,6 +41,8 @@ export function middleware(request: NextRequest) {
   });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  // Lets the layout name each page's own address (its canonical URL).
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
   requestHeaders.set("content-security-policy", policy);
   const withPolicy = (response: NextResponse) => {
     response.headers.set("content-security-policy", policy);
@@ -49,6 +52,10 @@ export function middleware(request: NextRequest) {
     withPolicy(NextResponse.next({ request: { headers: requestHeaders } }));
 
   if (!ROOT_DOMAIN) return next();
+  // Files from public/ are served as they are on every host. Redirecting them to
+  // the apex made the browser fetch them cross-origin, which the page's
+  // Content-Security-Policy blocks: broker logos and images went missing.
+  if (isStaticAsset(request.nextUrl.pathname)) return next();
 
   const host = request.headers.get("host") ?? "";
   if (!host.endsWith(ROOT_DOMAIN)) return next();
