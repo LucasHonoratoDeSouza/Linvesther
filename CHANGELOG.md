@@ -8,6 +8,9 @@ All notable changes are recorded here. The format follows
 
 ### Changed
 
+- `www.` and plain-http requests are redirected (308) to the canonical https
+  address, so search engines do not index the same page twice.
+
 - The landing page walkthrough video no longer has a soundtrack, so its sound
   button is gone.
 

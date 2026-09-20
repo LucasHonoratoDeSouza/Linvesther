@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy } from "./lib/contentSecurityPolicy";
+import { canonicalRedirect } from "./lib/canonicalHost";
 import { isStaticAsset } from "./lib/staticAssets";
 
 // Splits the landing page, the app (portfolio/explorer/disclose/…) and
@@ -52,6 +53,15 @@ export function middleware(request: NextRequest) {
     withPolicy(NextResponse.next({ request: { headers: requestHeaders } }));
 
   if (!ROOT_DOMAIN) return next();
+  // www and plain http are the same pages as the canonical address: send them
+  // there permanently, files included, so nothing is indexed twice.
+  const canonical = canonicalRedirect(
+    request.headers.get("host"),
+    request.headers.get("x-forwarded-proto"),
+    ROOT_DOMAIN,
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
+  if (canonical) return NextResponse.redirect(canonical, 308);
   // Files from public/ are served as they are on every host. Redirecting them to
   // the apex made the browser fetch them cross-origin, which the page's
   // Content-Security-Policy blocks: broker logos and images went missing.
