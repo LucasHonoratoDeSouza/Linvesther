@@ -8,7 +8,7 @@ publish = false
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_jcs = "0.2"
-sha2 = "0.10"
+sha2 = "0.11"
 getrandom = "0.2"
 hex = "0.4"
 thiserror = "1"
