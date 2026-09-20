@@ -15,7 +15,7 @@
     "@linvestherzk/api": "workspace:*",
     "@linvestherzk/chain-worker": "workspace:*",
     "pg": "8.23.0",
-    "viem": "2.38.6"
+    "viem": "2.56.6"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
