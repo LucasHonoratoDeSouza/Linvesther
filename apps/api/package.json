@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "11.0.2",
-    "@fastify/cors": "11.1.0",
+    "@fastify/cors": "11.3.0",
     "@linvestherzk/chain-worker": "workspace:*",
     "@simplewebauthn/server": "14.0.2",
     "canonicalize": "5.0.0",
