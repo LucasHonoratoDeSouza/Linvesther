@@ -69,6 +69,8 @@ export interface AppOptions {
   trustProxyHops?: number;
   /** Gas-paying actions the operator will fund per hour across all clients. */
   relayBudgetPerHour?: number;
+  /** Scales every traffic limit. For a test environment only; leave unset in production. */
+  limitMultiplier?: number;
   /** accountId -> the only address allowed to read it. */
   accountOwners?: Map<string, `0x${string}`>;
   /** Real on-chain identity lifecycle deps (Anvil/testnet + Postgres +
@@ -147,7 +149,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
   // nothing server-side to diagnose it from.
   registerErrorHandler(app);
   registerResponseHeaders(app);
-  registerTrafficLimits(app, { now, relayBudgetPerHour: options.relayBudgetPerHour });
+  registerTrafficLimits(app, { now, relayBudgetPerHour: options.relayBudgetPerHour, limitMultiplier: options.limitMultiplier });
 
   // A browser always names the page a state-changing request came from, so
   // a request from an origin the API does not serve is refused even though

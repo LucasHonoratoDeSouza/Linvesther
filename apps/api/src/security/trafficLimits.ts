@@ -61,14 +61,21 @@ export function registerTrafficLimits(
     now: () => Date;
     policies?: Policy[];
     relayBudgetPerHour?: number;
+    limitMultiplier?: number;
   },
 ): void {
+  // Scales every limit. Only for a test environment that signs in far faster
+  // than a person would.
+  const scale =
+    options.limitMultiplier !== undefined && options.limitMultiplier > 0
+      ? options.limitMultiplier
+      : 1;
   const policies = (options.policies ?? DEFAULT_POLICIES).map((policy) => ({
     policy,
-    limiter: new RateLimiter(policy.max, policy.windowMs),
+    limiter: new RateLimiter(policy.max * scale, policy.windowMs),
   }));
   const relayBudget = new RateLimiter(
-    options.relayBudgetPerHour ?? DEFAULT_RELAY_BUDGET_PER_HOUR,
+    (options.relayBudgetPerHour ?? DEFAULT_RELAY_BUDGET_PER_HOUR) * scale,
     60 * 60_000,
   );
   app.addHook("onRequest", async (request, reply) => {

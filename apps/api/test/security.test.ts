@@ -102,6 +102,16 @@ describe("rate limiting", () => {
     await app.close();
   });
 
+  it("can be scaled for a test environment that signs in faster than a person", async () => {
+    const { app } = await appWithSession({ limitMultiplier: 2 });
+    // The sign-in limit is 30 a minute; doubled it is 60.
+    for (let i = 0; i < 60; i++) {
+      expect((await app.inject({ method: "POST", url: "/auth/vault/challenge", remoteAddress: "203.0.113.50" })).statusCode).toBe(200);
+    }
+    expect((await app.inject({ method: "POST", url: "/auth/vault/challenge", remoteAddress: "203.0.113.50" })).statusCode).toBe(429);
+    await app.close();
+  });
+
   it("cannot be dodged by forging a forwarding header when behind one proxy", async () => {
     const { app } = await appWithSession({ trustProxyHops: 1 });
     const attempt = (forged: string) =>

@@ -135,7 +135,7 @@ if (process.env.DATABASE_URL) {
 // Loaded after the credential store is chosen, since it captures that store.
 const chainLifecycle = await loadChainLifecycle();
 
-const app = buildApp({ domain, trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 0), relayBudgetPerHour: process.env.RELAY_MAX_PER_HOUR ? Number(process.env.RELAY_MAX_PER_HOUR) : undefined, publicTrackStore, sessionStore, disclosureStore, secureCookies: (process.env.WEBAUTHN_ORIGIN ?? "").startsWith("https://"), corsOrigins, chainLifecycle, binanceWorkerBinaryPath, profileSettingsStore });
+const app = buildApp({ domain, trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 0), limitMultiplier: process.env.TRAFFIC_LIMIT_MULTIPLIER ? Number(process.env.TRAFFIC_LIMIT_MULTIPLIER) : undefined, relayBudgetPerHour: process.env.RELAY_MAX_PER_HOUR ? Number(process.env.RELAY_MAX_PER_HOUR) : undefined, publicTrackStore, sessionStore, disclosureStore, secureCookies: (process.env.WEBAUTHN_ORIGIN ?? "").startsWith("https://"), corsOrigins, chainLifecycle, binanceWorkerBinaryPath, profileSettingsStore });
 
 if (chainLifecycle) {
   // Keeps the indexer's local view continuously close to the chain tip,

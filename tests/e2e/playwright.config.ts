@@ -43,6 +43,11 @@ export default defineConfig({
         ACCOUNT_REGISTRY_ADDRESS: EXPECTED_ACCOUNT_REGISTRY,
         ACCOUNT_FACTORY_ADDRESS: EXPECTED_ACCOUNT_FACTORY,
         DATABASE_URL,
+        // The chain here is a fresh local Anvil: never inherit a real deployment's block or registry from the caller's environment.
+        // The browser suite signs in far faster than a person, so it runs with the per-client limits scaled up.
+        TRAFFIC_LIMIT_MULTIPLIER: "1000",
+        CHAIN_DEPLOY_BLOCK: "0",
+        PROFILE_REGISTRY_ADDRESS: "",
       },
     },
     {

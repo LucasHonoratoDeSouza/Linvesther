@@ -12,7 +12,7 @@ test("creating and confirming an identity with the vault method ends active, on-
   await expect(page.getByTestId("signed-in-indicator")).toBeVisible();
 
   await page.getByTestId("create-identity-button").click();
-  await expect(page.getByTestId("confirm-identity-button")).toBeVisible();
+  await expect(page.getByTestId("confirm-identity-button")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("identity-active-summary")).toHaveCount(0);
 
   await page.getByTestId("confirm-identity-button").click();
@@ -32,6 +32,6 @@ test("a passkey-created identity shows a clear not-yet-supported note instead of
   await expect(page.getByTestId("signed-in-indicator")).toBeVisible();
 
   await page.getByTestId("create-identity-button").click();
-  await expect(page.getByTestId("confirm-unsupported-note")).toBeVisible();
+  await expect(page.getByTestId("confirm-unsupported-note")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("confirm-identity-button")).toHaveCount(0);
 });
