@@ -145,6 +145,10 @@ jobs:
       - run: make contracts-deps
       - run: forge build --root contracts
       - run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --manifest-path services/Cargo.toml -p binance-worker
+        env:
+          RISC0_SKIP_BUILD: "1"
       - run: pnpm --filter e2e-tests exec playwright install --with-deps chromium
       - run: make check-e2e
 
