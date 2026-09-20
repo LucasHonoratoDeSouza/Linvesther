@@ -71,20 +71,10 @@ export function middleware(request: NextRequest) {
     new URL(
       `${request.nextUrl.protocol}//${targetHost}${path}${request.nextUrl.search}`,
     );
-  // Same-host: only the pathname changes, so a plain relative rewrite
-  // (no host reassignment) is enough, and avoids Next treating it as an
-  // external URL it would need to fetch itself.
-  const rewriteTo = (path: string) =>
-    withPolicy(
-      NextResponse.rewrite(new URL(path, request.url), {
-        request: { headers: requestHeaders },
-      }),
-    );
-
   if (subdomain === "app") {
     if (zone === "docs")
       return NextResponse.redirect(to(`docs.${ROOT_DOMAIN}`, pathname));
-    if (zone === "landing" && pathname === "/") return rewriteTo("/portfolio");
+    if (zone === "landing" && pathname === "/") return next(); // "/" is rewritten to /portfolio in next.config.mjs
     if (zone === "landing")
       return NextResponse.redirect(to(ROOT_DOMAIN, pathname));
     return next();
@@ -92,7 +82,7 @@ export function middleware(request: NextRequest) {
   if (subdomain === "docs") {
     if (zone === "app")
       return NextResponse.redirect(to(`app.${ROOT_DOMAIN}`, pathname));
-    if (zone === "landing" && pathname === "/") return rewriteTo("/docs");
+    if (zone === "landing" && pathname === "/") return next(); // "/" is rewritten to /docs in next.config.mjs
     if (zone === "landing")
       return NextResponse.redirect(to(ROOT_DOMAIN, pathname));
     return next();
