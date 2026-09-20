@@ -6,6 +6,14 @@ All notable changes are recorded here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- Creating an identity failed with `internal_error` right after the API had been
+  restarted. The indexer resumes at the highest block it stored and read that
+  block's events again, and inserting an identity, track or account twice was an
+  error. Those inserts now ignore a row that already exists, and overlapping
+  syncs run one after another instead of walking the same blocks together.
+
 ### Changed
 
 - `www.` and plain-http requests are redirected (308) to the canonical https

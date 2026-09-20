@@ -121,3 +121,29 @@ describe("Finality separation: safe/included never report as finalized", () => {
     expect(indexer.blocks().every((b) => b.tag === "included")).toBe(true);
   });
 });
+
+describe("Syncs that overlap", () => {
+  it("apply each block once when several requests ask to sync at the same moment", async () => {
+    const chain = new FakeChain();
+    chain.mine(4);
+    const store = new MemoryProjectionStore();
+    const indexer = new Indexer(store);
+
+    await Promise.all([1, 2, 3, 4].map(() => indexer.sync(chain.client(), 0n)));
+
+    expect(store.applyLog).toHaveLength(5);
+    expect(indexer.blocks().map((b) => b.header.number)).toEqual([0n, 1n, 2n, 3n, 4n]);
+  });
+
+  it("keeps working after one sync fails", async () => {
+    const chain = new FakeChain();
+    const store = new MemoryProjectionStore();
+    const indexer = new Indexer(store);
+    const broken = { ...chain.client(), getSnapshot: async () => { throw new Error("rpc down"); } };
+
+    await expect(indexer.sync(broken, 0n)).rejects.toThrow("rpc down");
+    await indexer.sync(chain.client(), 0n);
+
+    expect(indexer.blocks()).toHaveLength(1);
+  });
+});
