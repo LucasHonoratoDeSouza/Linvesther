@@ -65,15 +65,31 @@ export class PostgresNonceStore implements NonceStore {
   ) {}
 
   async ensureSchema(): Promise<void> {
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS api_nonces (
-        nonce TEXT PRIMARY KEY,
-        purpose TEXT NOT NULL,
-        expires_at BIGINT NOT NULL
-      )`);
-    await this.pool.query(
-      "CREATE INDEX IF NOT EXISTS api_nonces_expiry ON api_nonces (purpose, expires_at)",
-    );
+    // Several stores share this table and are set up at the same moment.
+    // Postgres can fail two concurrent CREATE TABLE IF NOT EXISTS on the same
+    // name, so the setup takes a lock and runs one at a time.
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('api_nonces_schema'))",
+      );
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS api_nonces (
+          nonce TEXT PRIMARY KEY,
+          purpose TEXT NOT NULL,
+          expires_at BIGINT NOT NULL
+        )`);
+      await client.query(
+        "CREATE INDEX IF NOT EXISTS api_nonces_expiry ON api_nonces (purpose, expires_at)",
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async issue(): Promise<string> {

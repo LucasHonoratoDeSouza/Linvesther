@@ -112,6 +112,24 @@ describe("rate limiting", () => {
     await app.close();
   });
 
+  it("keeps its counts wherever it is told to, not only in memory", async () => {
+    const seen: string[] = [];
+    const { app } = await appWithSession({
+      limiterFactory: (name) => ({
+        allow: (key) => {
+          seen.push(`${name}|${key}`);
+          return true;
+        },
+      }),
+    });
+    await app.inject({ method: "POST", url: "/auth/vault/challenge", remoteAddress: "203.0.113.60" });
+    await app.inject({ method: "POST", url: "/identities", remoteAddress: "203.0.113.60" });
+    expect(seen).toContain("sign-in|sign-in:203.0.113.60");
+    expect(seen).toContain("relay|relay:203.0.113.60");
+    expect(seen).toContain("relay-budget|all");
+    await app.close();
+  });
+
   it("cannot be dodged by forging a forwarding header when behind one proxy", async () => {
     const { app } = await appWithSession({ trustProxyHops: 1 });
     const attempt = (forged: string) =>

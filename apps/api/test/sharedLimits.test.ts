@@ -155,3 +155,21 @@ describe("sign-in challenges shared between instances (postgres)", () => {
     expect(answers.filter(Boolean)).toHaveLength(1);
   });
 });
+
+describe("setting up the challenge table", () => {
+  it("survives several stores doing it at the same moment, which is how the API starts", async () => {
+    // A fresh schema each time: the race only exists while the table does not yet exist.
+    for (let round = 0; round < 5; round++) {
+      const fresh = `api_race_${randomBytes(6).toString("hex")}`;
+      await admin.query(`CREATE SCHEMA ${fresh}`);
+      const racing = new pg.Pool({ connectionString: DATABASE_URL, options: `-c search_path=${fresh}` });
+      try {
+        const stores = ["vault", "webauthn-registration", "webauthn-authentication"].map((purpose) => new PostgresNonceStore(racing, purpose));
+        await expect(Promise.all(stores.map((store) => store.ensureSchema()))).resolves.toBeDefined();
+      } finally {
+        await racing.end();
+        await admin.query(`DROP SCHEMA ${fresh} CASCADE`);
+      }
+    }
+  });
+});

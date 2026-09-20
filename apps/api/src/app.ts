@@ -18,7 +18,11 @@ import { registerErrorHandler } from "./security/errors.js";
 import { registerResponseHeaders } from "./security/responseHeaders.js";
 import { registerTrafficLimits } from "./security/trafficLimits.js";
 import { requireSession } from "./auth/requireSession.js";
-import { MemorySessionStore, SESSION_TTL_MS, type SessionStore } from "./auth/sessionStore.js";
+import {
+  MemorySessionStore,
+  SESSION_TTL_MS,
+  type SessionStore,
+} from "./auth/sessionStore.js";
 import { credentialStore } from "./auth/identitySignature.js";
 import {
   beginChallenge,
@@ -110,7 +114,9 @@ function deriveSubjectKey(qx: `0x${string}`, qy: `0x${string}`): `0x${string}` {
 
 /** Trusts only the nearest `hops` proxies, so a client cannot choose its own
  * address by sending a forged forwarding header. */
-function trustHops(hops: number | undefined): false | ((address: string, hop: number) => boolean) {
+function trustHops(
+  hops: number | undefined,
+): false | ((address: string, hop: number) => boolean) {
   return hops && hops > 0 ? (_address, hop) => hop < hops : false;
 }
 
@@ -144,14 +150,22 @@ export function buildApp(options: AppOptions): FastifyInstance {
     options.binanceWorkerBinaryPath ?? "services/target/debug/binance-worker";
   const now = options.now ?? (() => new Date());
 
-  const app = Fastify({ bodyLimit: options.bodyLimitBytes ?? 1024 * 1024, trustProxy: trustHops(options.trustProxyHops) });
+  const app = Fastify({
+    bodyLimit: options.bodyLimitBytes ?? 1024 * 1024,
+    trustProxy: trustHops(options.trustProxyHops),
+  });
   // No logger is configured (tests would otherwise be noisy), so an
   // unhandled route error would otherwise vanish entirely — the client
   // only ever sees Fastify's generic "Internal Server Error" body, with
   // nothing server-side to diagnose it from.
   registerErrorHandler(app);
   registerResponseHeaders(app);
-  registerTrafficLimits(app, { now, relayBudgetPerHour: options.relayBudgetPerHour, limitMultiplier: options.limitMultiplier });
+  registerTrafficLimits(app, {
+    now,
+    relayBudgetPerHour: options.relayBudgetPerHour,
+    limitMultiplier: options.limitMultiplier,
+    limiterFactory: options.limiterFactory,
+  });
 
   // A browser always names the page a state-changing request came from, so
   // a request from an origin the API does not serve is refused even though
@@ -261,7 +275,12 @@ export function buildApp(options: AppOptions): FastifyInstance {
         return reply.code(401).send({ error: "signature_invalid" });
       }
       const subjectKey = deriveSubjectKey(result.qx, result.qy);
-      await credentialStore.register(subjectKey, result.qx, result.qy, "webauthn");
+      await credentialStore.register(
+        subjectKey,
+        result.qx,
+        result.qy,
+        "webauthn",
+      );
       const session = await sessionStore.create(subjectKey);
       reply.setCookie("sid", session.id, sessionCookie);
       // The client only ever sees the WebAuthn credential's opaque id/rawId,
