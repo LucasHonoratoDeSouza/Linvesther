@@ -71,17 +71,17 @@ export class PostgresRateLimiter implements RateLimit {
   async allow(key: string, now: number): Promise<boolean> {
     // One statement: start a new window when the last one has ended, otherwise count.
     const result = await this.pool.query<{ count: number }>(
-      `INSERT INTO api_rate_limits (bucket, key, count, window_start) VALUES ($1, $2, 1, $3)
+      `INSERT INTO api_rate_limits (bucket, key, count, window_start) VALUES ($1, $2, 1, $3::bigint)
        ON CONFLICT (bucket, key) DO UPDATE SET
-         count = CASE WHEN api_rate_limits.window_start <= $3 - $4 THEN 1 ELSE api_rate_limits.count + 1 END,
-         window_start = CASE WHEN api_rate_limits.window_start <= $3 - $4 THEN $3 ELSE api_rate_limits.window_start END
+         count = CASE WHEN api_rate_limits.window_start <= ($3::bigint - $4::bigint) THEN 1 ELSE api_rate_limits.count + 1 END,
+         window_start = CASE WHEN api_rate_limits.window_start <= ($3::bigint - $4::bigint) THEN $3::bigint ELSE api_rate_limits.window_start END
        RETURNING count`,
       [this.bucket, key, now, this.windowMs],
     );
     // Ended windows are only dead weight; clearing a few now and then keeps the table bounded.
     if (Math.random() < 0.01) {
       await this.pool.query(
-        "DELETE FROM api_rate_limits WHERE bucket = $1 AND window_start <= $2 - $3",
+        "DELETE FROM api_rate_limits WHERE bucket = $1 AND window_start <= $2::bigint - $3::bigint",
         [this.bucket, now, this.windowMs],
       );
     }
