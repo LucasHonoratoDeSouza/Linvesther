@@ -5,12 +5,18 @@ name: ci
 
 on:
   push:
-    branches: [master, main]
+    branches: [main, dev]
   pull_request:
+
+# Jobs that only type-check or run tests that never execute the zkVM guest set
+# RISC0_SKIP_BUILD, so they do not need the RISC Zero toolchain. Only the `zk`
+# job installs it and builds the guest.
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RISC0_SKIP_BUILD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -52,6 +58,8 @@ jobs:
 
   rust:
     runs-on: ubuntu-latest
+    env:
+      RISC0_SKIP_BUILD: "1"
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +79,8 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    env:
+      RISC0_SKIP_BUILD: "1"
     needs: build
     services:
       postgres:

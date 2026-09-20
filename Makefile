@@ -49,7 +49,8 @@ check-rust:
 		echo "check-rust: no crates delivered yet; failing rather than reporting a pass with zero coverage" >&2; \
 		exit 1; \
 	fi
-	cargo test --workspace --locked
+	# The zkVM guest crates are tested by check-zk, which builds the guest.
+	cargo test --workspace --locked --exclude zkvm-methods --exclude zkvm-methods-tls-origin --exclude zkvm-methods-statistics
 
 # --- contracts: Foundry unit/fuzz/invariant ---
 check-contracts:
