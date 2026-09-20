@@ -197,6 +197,11 @@ export function renameAccount(accountId: string, label: string): Promise<ApiResu
   });
 }
 
+/** Removes a connected account: its stored credential and everything collected for it. */
+export function removeAccount(accountId: string): Promise<ApiResult<{ removed: boolean; broker: string }>> {
+  return call(`/accounts/${accountId}`, { method: "DELETE" });
+}
+
 export function connectIbkr(accountId: string, token: string, queryId: string, label?: string): Promise<ApiResult<BinanceConnectResult>> {
   return call(`/accounts/${accountId}/ibkr-connection`, {
     method: "POST",

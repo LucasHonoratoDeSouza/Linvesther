@@ -8,6 +8,11 @@ All notable changes are recorded here. The format follows
 
 ### Security
 
+- Stored exchange credentials are now bound to their broker, account and field
+  (authenticated data), so a ciphertext copied to another row no longer
+  decrypts. The key can be rotated: the previous key stays readable, and the
+  worker's `rekey` re-encrypts everything (`credential-check` reports without
+  changing). Existing credentials keep working and are upgraded by `rekey`.
 - Errors from Interactive Brokers, Coinbase and Binance no longer repeat the
   request URL. That URL carried the Flex Web Service token (or a request
   signature) into messages shown to people and written to logs.
@@ -43,6 +48,18 @@ All notable changes are recorded here. The format follows
   from the network.
 
 ### Added
+
+- Sign-in challenges, per-client traffic limits and the gas budget are kept in
+  Postgres when `DATABASE_URL` is set, so several API instances behave as one and a
+  restart forgets nothing. The in-memory versions remain for tests and single
+  instances.
+- The relayer refuses to broadcast below a balance floor (`RELAYER_MIN_BALANCE_WEI`),
+  and the API answers 503 `relayer_underfunded` instead of failing mid-transaction.
+
+- Remove a connected account from Portfolio: the stored credential and everything
+  collected for it are deleted, and it stops counting in the public profile.
+- A sound button on the landing page video, which autoplays muted; people who ask for
+  reduced motion get a paused video with the browser's controls.
 
 - Proofs record which collector key signed the source data. The verifier
   classifies it against a list of trusted collectors (`trust/collectors.json`)

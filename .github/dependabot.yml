@@ -1,21 +1,94 @@
+# Updates go to `dev` first, and small ones arrive as one grouped pull request
+# per ecosystem each month.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    target-branch: dev
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Major migrations are planned one at a time (see the dependency upgrade plan issue).
+      - dependency-name: next
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: cargo
     directory: /
+    target-branch: dev
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Cryptography and serialization crates are tied to the zkVM guest, the
+      # receipt encoding and shared test vectors. A new major or minor version
+      # (for 0.x crates a minor is breaking) needs a deliberate compatibility
+      # plan, not an automatic pull request. Patch releases still arrive.
+      - dependency-name: k256
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: sha2
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: ed25519-dalek
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: hmac
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: getrandom
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: bincode
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "risc0-*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: thiserror
+        update-types: ["version-update:semver-major"]
+      - dependency-name: base64
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
   - package-ecosystem: cargo
     directory: /services
+    target-branch: dev
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Cryptography and serialization crates are tied to the zkVM guest, the
+      # receipt encoding and shared test vectors. A new major or minor version
+      # (for 0.x crates a minor is breaking) needs a deliberate compatibility
+      # plan, not an automatic pull request. Patch releases still arrive.
+      - dependency-name: k256
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: sha2
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: ed25519-dalek
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: hmac
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: getrandom
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: bincode
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "risc0-*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: thiserror
+        update-types: ["version-update:semver-major"]
+      - dependency-name: base64
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
   - package-ecosystem: github-actions
     directory: /
+    target-branch: dev
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -37,7 +37,7 @@ let runningWorkers = 0;
  * JSON-stringified) to its stdin, and parses its stdout as JSON. The
  * worker's own `{"ok": false, "error": ...}` shape on failure is
  * surfaced as a rejected promise, not swallowed. */
-export function invokeWorker<T>(options: WorkerBinaryOptions, subcommand: "connect" | "status" | "list" | "rename" | "sync" | "series" | "nav" | "performance" | "prove-performance" | "collector-identity", stdinPayload: string): Promise<T> {
+export function invokeWorker<T>(options: WorkerBinaryOptions, subcommand: "connect" | "status" | "list" | "rename" | "sync" | "series" | "nav" | "performance" | "prove-performance" | "collector-identity" | "disconnect", stdinPayload: string): Promise<T> {
   if (runningWorkers >= MAX_CONCURRENT_WORKERS) {
     return Promise.reject(new WorkerBusyError());
   }

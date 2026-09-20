@@ -50,7 +50,9 @@ flowchart TB
 | Ownership, bindings, profile text and proofs | The chain |
 
 Without a database the API keeps the first group in memory and says so at start-up.
-Sign-in challenges are always in memory, so the API runs as a single instance. Each
+Sign-in challenges, traffic limits and the gas budget are shared in Postgres too, so
+several API instances behave as one; without a database they are per process and the
+API must run as a single instance. Each
 store has an in-memory and a Postgres implementation asserted by the same tests.
 
 `infra/local/up.sh` starts all of this locally with no outside network: a

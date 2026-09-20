@@ -27,8 +27,10 @@ profiles and the account-connection routes.
 - A successful sign-in sets an `HttpOnly`, `SameSite=Lax` session cookie
   (`Secure` over HTTPS) for 30 days. With `DATABASE_URL` set, sessions, identities,
   passkeys and published claims are kept in Postgres and survive a restart;
-  without it they are in memory. Sign-in challenges are always in memory, so run
-  a single instance.
+  without it they are in memory. Sign-in challenges, traffic limits and the
+  gas budget are shared in Postgres the same way, so several instances behave as
+  one and a restart forgets nothing; without a database they are per process, so
+  run a single instance.
 
 ## Limits
 

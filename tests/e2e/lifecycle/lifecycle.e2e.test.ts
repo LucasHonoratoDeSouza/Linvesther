@@ -1,3 +1,4 @@
+import { createThrowawayDatabase } from "../testDatabase.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { type ChildProcess, spawn } from "node:child_process";
@@ -30,7 +31,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 const DOMAIN = "app.linvestherzk.example";
 const PORT = 8850;
 const RPC_URL = `http://127.0.0.1:${PORT}`;
-const DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://linvestherzk:linvestherzk-local-dev-only@localhost:5433/linvestherzk";
+let DATABASE_URL: string;
+let throwawayDatabase: Awaited<ReturnType<typeof createThrowawayDatabase>>;
 const DEPLOYER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as const;
 const CONTRACTS_OUT = path.resolve(import.meta.dirname, "../../../contracts/out");
 
@@ -109,8 +111,9 @@ beforeAll(async () => {
   const p256VaultImpl = await deploy("P256VaultAccount", "P256VaultAccount", []);
   const accountFactory = await deploy("AccountFactory", "AccountFactory", accountFactoryAbi, [webAuthnImpl, p256VaultImpl]);
 
+  throwawayDatabase = await createThrowawayDatabase("linvesther_lifecycle");
+  DATABASE_URL = throwawayDatabase.url;
   pool = new Pool({ connectionString: DATABASE_URL });
-  await pool.query("DROP TABLE IF EXISTS accounts, tracks, identities, indexed_blocks, schema_migrations CASCADE");
   await runMigrations(pool);
 
   const relayerAccount = privateKeyToAccount(DEPLOYER_KEY);
@@ -132,6 +135,7 @@ beforeAll(async () => {
 afterAll(async () => {
   anvil.kill();
   await pool.end();
+  await throwawayDatabase.drop();
 });
 
 async function buildTestApp() {

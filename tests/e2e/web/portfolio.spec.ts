@@ -46,8 +46,9 @@ test("portfolio: signing in offers to connect a first account, and the popup lis
   const modal = page.getByTestId("add-account-modal");
   await expect(modal).toBeVisible();
   await expect(modal.getByTestId("broker-option-binance")).toBeVisible();
-  // Stock brokers aren't connectable yet — said plainly, not hidden or faked.
-  await expect(modal).toContainText("Stock brokers are coming");
+  // Every broker that can be connected is listed, crypto and stocks alike.
+  await expect(modal.getByTestId("broker-option-coinbase")).toBeVisible();
+  await expect(modal.getByTestId("broker-option-ibkr")).toBeVisible();
 
   await modal.getByTestId("broker-option-binance").click();
   // isOwner's self-ownership rule: the signed-in identity owns the

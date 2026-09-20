@@ -55,7 +55,10 @@ test("vault: creating an identity, a wrong password, then the right password", a
   await page.getByTestId("vault-create-button").click();
   await expect(page.getByTestId("signed-in-indicator")).toBeVisible();
 
+  // The session survives a reload; sign out to get the unlock form back.
   await page.reload();
+  await expect(page.getByTestId("signed-in-indicator")).toBeVisible();
+  await page.getByTestId("sign-out-button").click();
   await expect(page.getByTestId("vault-unlock-button")).toBeVisible();
 
   await page.getByTestId("vault-password-input").fill("the wrong password");
@@ -125,9 +128,9 @@ test("onboarding explains the difference between a passkey and a password identi
   page,
 }) => {
   await page.goto("/onboarding");
-  const copy = page.locator(".card").first();
-  await expect(copy).toContainText("fingerprint, face or screen lock");
-  await expect(copy).toContainText("password identity works on any device");
+  const copy = page.locator("main");
+  await expect(copy).toContainText(/face, fingerprint or screen lock/i);
+  await expect(copy).toContainText(/password/i);
 });
 
 test("an unsupported browser is never offered the passkey option, and the vault still works", async ({

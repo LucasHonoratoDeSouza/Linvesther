@@ -15,6 +15,7 @@ pub mod pnl;
 #[cfg(feature = "proving")]
 pub mod prove;
 pub mod publish;
+pub mod rekey;
 pub mod secrets;
 pub mod stream;
 pub mod sync;

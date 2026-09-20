@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { RateLimiter } from "../auth/rateLimiter.js";
+import { RateLimiter, type RateLimit } from "../auth/rateLimiter.js";
 
 /** One kind of traffic and how much of it one client may send. */
 interface Policy {
@@ -61,14 +61,29 @@ export function registerTrafficLimits(
     now: () => Date;
     policies?: Policy[];
     relayBudgetPerHour?: number;
+    limitMultiplier?: number;
+    /** Where the counts live. In memory by default; a shared store makes the
+     * limits hold across instances and restarts. */
+    limiterFactory?: (name: string, max: number, windowMs: number) => RateLimit;
   },
 ): void {
+  // Scales every limit. Only for a test environment that signs in far faster
+  // than a person would.
+  const scale =
+    options.limitMultiplier !== undefined && options.limitMultiplier > 0
+      ? options.limitMultiplier
+      : 1;
+  const makeLimiter =
+    options.limiterFactory ??
+    ((_name: string, max: number, windowMs: number) =>
+      new RateLimiter(max, windowMs));
   const policies = (options.policies ?? DEFAULT_POLICIES).map((policy) => ({
     policy,
-    limiter: new RateLimiter(policy.max, policy.windowMs),
+    limiter: makeLimiter(policy.name, policy.max * scale, policy.windowMs),
   }));
-  const relayBudget = new RateLimiter(
-    options.relayBudgetPerHour ?? DEFAULT_RELAY_BUDGET_PER_HOUR,
+  const relayBudget = makeLimiter(
+    "relay-budget",
+    (options.relayBudgetPerHour ?? DEFAULT_RELAY_BUDGET_PER_HOUR) * scale,
     60 * 60_000,
   );
   app.addHook("onRequest", async (request, reply) => {
@@ -81,17 +96,20 @@ export function registerTrafficLimits(
     const spendsGas = request.method !== "GET" && RELAY.test(path);
     if (!match) return;
     if (
-      !match.limiter.allow(
+      !(await match.limiter.allow(
         `${match.policy.name}:${request.ip}`,
         options.now().getTime(),
-      )
+      ))
     ) {
       return reply
         .code(429)
         .header("retry-after", String(Math.ceil(match.policy.windowMs / 1000)))
         .send({ error: "rate_limited" });
     }
-    if (spendsGas && !relayBudget.allow("all", options.now().getTime())) {
+    if (
+      spendsGas &&
+      !(await relayBudget.allow("all", options.now().getTime()))
+    ) {
       return reply
         .code(503)
         .header("retry-after", "3600")

@@ -17,14 +17,14 @@
     "start": "tsx src/server.ts"
   },
   "dependencies": {
-    "@fastify/cookie": "11.0.2",
-    "@fastify/cors": "11.1.0",
+    "@fastify/cookie": "11.1.2",
+    "@fastify/cors": "11.3.0",
     "@linvestherzk/chain-worker": "workspace:*",
     "@simplewebauthn/server": "14.0.2",
     "canonicalize": "5.0.0",
     "fastify": "5.12.5",
     "pg": "8.23.0",
-    "viem": "2.38.6"
+    "viem": "2.56.6"
   },
   "devDependencies": {
     "@types/node": "26.6.0",

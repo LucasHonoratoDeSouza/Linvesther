@@ -1,6 +1,12 @@
 import { MemoryNonceStore, type NonceStore } from "./nonceStore.js";
 
-const nonceStore: NonceStore = new MemoryNonceStore();
+let nonceStore: NonceStore = new MemoryNonceStore();
+
+/** Chooses where sign-in challenges are kept. In memory by default; a
+ * deployment with a database passes a shared store. */
+export function useVaultNonceStore(store: NonceStore): void {
+  nonceStore = store;
+}
 
 function hexToBytes(hex: `0x${string}`): Uint8Array<ArrayBuffer> {
   const clean = hex.slice(2);
@@ -13,7 +19,7 @@ function hexToBytes(hex: `0x${string}`): Uint8Array<ArrayBuffer> {
 
 /** Issues a fresh, single-use login challenge — same "issue once, consume
  * once" nonce semantics as the SIWE flow this replaces. */
-export function beginChallenge(): string {
+export async function beginChallenge(): Promise<string> {
   return nonceStore.issue();
 }
 
@@ -60,7 +66,7 @@ export async function verifySignature(
   challenge: string,
   signature: `0x${string}`,
 ): Promise<boolean> {
-  if (!nonceStore.consume(challenge)) {
+  if (!(await nonceStore.consume(challenge))) {
     return false;
   }
   return verifyRawSignature(qx, qy, challenge, signature);

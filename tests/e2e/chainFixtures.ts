@@ -1,11 +1,22 @@
+import { ADMIN_DATABASE_URL, databaseUrl } from "./testDatabase.js";
+
 // Shared between globalSetup.ts (deploys and verifies these addresses)
 // and playwright.config.ts (passes them to apps/api's webServer as
 // static env vars — Playwright evaluates the config once, before
 // globalSetup runs, so these can't be discovered dynamically at
 // config-load time; they're deterministic CREATE addresses instead,
 // verified against the real deploy in globalSetup.ts).
-export const ANVIL_PORT = 8901;
-export const DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://linvestherzk:linvestherzk-local-dev-only@localhost:5433/linvestherzk";
+export const ANVIL_PORT = Number(process.env.E2E_ANVIL_PORT ?? 8901);
+// Ports well away from a development instance (4300/4301), so the suite can run next to one.
+export const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 14300);
+export const API_PORT = Number(process.env.E2E_API_PORT ?? 14301);
+
+// A database of this run's own, created by globalSetup and dropped afterwards.
+// Named once, in the first process to load this file, so the config, the
+// setup and the servers it starts all agree on it.
+process.env.E2E_DATABASE_NAME ??= `linvesther_e2e_${process.pid}`;
+export const E2E_DATABASE_NAME = process.env.E2E_DATABASE_NAME;
+export const DATABASE_URL = databaseUrl(ADMIN_DATABASE_URL, E2E_DATABASE_NAME);
 
 // Anvil's well-known default account #0 — a public test-only fixture,
 // not a secret, used by every Foundry/Hardhat local devnet.

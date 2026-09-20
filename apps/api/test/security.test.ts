@@ -102,6 +102,34 @@ describe("rate limiting", () => {
     await app.close();
   });
 
+  it("can be scaled for a test environment that signs in faster than a person", async () => {
+    const { app } = await appWithSession({ limitMultiplier: 2 });
+    // The sign-in limit is 30 a minute; doubled it is 60.
+    for (let i = 0; i < 60; i++) {
+      expect((await app.inject({ method: "POST", url: "/auth/vault/challenge", remoteAddress: "203.0.113.50" })).statusCode).toBe(200);
+    }
+    expect((await app.inject({ method: "POST", url: "/auth/vault/challenge", remoteAddress: "203.0.113.50" })).statusCode).toBe(429);
+    await app.close();
+  });
+
+  it("keeps its counts wherever it is told to, not only in memory", async () => {
+    const seen: string[] = [];
+    const { app } = await appWithSession({
+      limiterFactory: (name) => ({
+        allow: (key) => {
+          seen.push(`${name}|${key}`);
+          return true;
+        },
+      }),
+    });
+    await app.inject({ method: "POST", url: "/auth/vault/challenge", remoteAddress: "203.0.113.60" });
+    await app.inject({ method: "POST", url: "/identities", remoteAddress: "203.0.113.60" });
+    expect(seen).toContain("sign-in|sign-in:203.0.113.60");
+    expect(seen).toContain("relay|relay:203.0.113.60");
+    expect(seen).toContain("relay-budget|all");
+    await app.close();
+  });
+
   it("cannot be dodged by forging a forwarding header when behind one proxy", async () => {
     const { app } = await appWithSession({ trustProxyHops: 1 });
     const attempt = (forged: string) =>
@@ -153,6 +181,18 @@ describe("what a client is told", () => {
     expect(response.statusCode).toBe(500);
     expect(response.json()).toEqual({ error: "internal_error" });
     expect(response.body).not.toContain("hunter2");
+    await app.close();
+  });
+
+  it("reports a condition it has a stable code for, without its message", async () => {
+    const app = buildApp({ domain: "localhost" });
+    app.get("/short", async () => {
+      throw Object.assign(new Error("balance 123 wei below 456 wei"), { publicCode: "relayer_underfunded", statusCode: 503 });
+    });
+    await app.ready();
+    const response = await app.inject({ method: "GET", url: "/short" });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: "relayer_underfunded" });
     await app.close();
   });
 

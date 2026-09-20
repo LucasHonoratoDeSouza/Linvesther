@@ -31,7 +31,7 @@ async function sign(privateKey: CryptoKey, message: string): Promise<`0x${string
 describe("vault verifySignature", () => {
   it("accepts a real P-256 signature over an issued challenge", async () => {
     const { privateKey, qx, qy } = await generateKeyPair();
-    const challenge = beginChallenge();
+    const challenge = await beginChallenge();
     const signature = await sign(privateKey, challenge);
 
     const result = await verifySignature(qx, qy, challenge, signature);
@@ -41,7 +41,7 @@ describe("vault verifySignature", () => {
   it("rejects a signature produced by a different key", async () => {
     const owner = await generateKeyPair();
     const stranger = await generateKeyPair();
-    const challenge = beginChallenge();
+    const challenge = await beginChallenge();
     const signature = await sign(stranger.privateKey, challenge);
 
     const result = await verifySignature(owner.qx, owner.qy, challenge, signature);
@@ -58,7 +58,7 @@ describe("vault verifySignature", () => {
 
   it("rejects a replayed challenge on the second verification attempt", async () => {
     const { privateKey, qx, qy } = await generateKeyPair();
-    const challenge = beginChallenge();
+    const challenge = await beginChallenge();
     const signature = await sign(privateKey, challenge);
 
     const first = await verifySignature(qx, qy, challenge, signature);

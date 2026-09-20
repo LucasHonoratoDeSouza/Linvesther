@@ -22,6 +22,16 @@ class TtlCache<T> {
 
   constructor(private readonly now: () => Date) {}
 
+  delete(key: string): void {
+    this.entries.delete(key);
+  }
+
+  deleteWhere(matches: (key: string) => boolean): void {
+    for (const key of this.entries.keys()) {
+      if (matches(key)) this.entries.delete(key);
+    }
+  }
+
   private evict(): void {
     const now = this.now().getTime();
     for (const [key, entry] of this.entries) {
@@ -83,6 +93,15 @@ export class PublicProfileService {
     this.accountsCache = new TtlCache(options.now);
     this.performanceCache = new TtlCache(options.now);
     this.seriesCache = new TtlCache(options.now);
+  }
+
+  /** Drops what is remembered about a removed account, so the next public read
+   * no longer includes it. */
+  forgetAccount(address: string, accountId: string): void {
+    this.accountsCache.delete(address.toLowerCase());
+    const id = accountId.toLowerCase();
+    this.performanceCache.delete(id);
+    this.seriesCache.deleteWhere((key) => key.startsWith(`${id}|`));
   }
 
   private origin$: Promise<CollectorOrigin> | null = null;

@@ -1,3 +1,5 @@
+import { hostRewrites } from "./lib/hostRewrites.mjs";
+
 // Dev-only: this app now answers on three subdomains (landing/app/docs)
 // plus access by LAN IP, all proxied to this one local dev server — Next
 // blocks dev asset/HMR requests whose Origin it doesn't recognize
@@ -41,6 +43,9 @@ const nextConfig = {
   // The list of trusted collectors lives at the repository root (`trust/`),
   // shared with the command-line verifier.
   experimental: { externalDir: true },
+  async rewrites() {
+    return hostRewrites(process.env.ROOT_DOMAIN);
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

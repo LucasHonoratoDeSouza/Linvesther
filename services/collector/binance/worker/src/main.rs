@@ -20,7 +20,7 @@
 //! `prove-performance`) `BINANCE_WORKER_A0_SIGNING_KEY` come from the
 //! environment.
 
-use binance_worker::crypto::{decrypt, encrypt, MasterKey};
+use binance_worker::crypto::{credential_context, decrypt, encrypt, MasterKey};
 use binance_worker::{coinbase, db, ibkr, stream, sync};
 use coinbase_client::{CoinbaseClient, Credentials};
 use ibkr_client::{Credentials as IbkrCredentials, IbkrClient};
@@ -88,7 +88,12 @@ fn master_key() -> Result<MasterKey, String> {
         "BINANCE_WORKER_ENCRYPTION_KEY (or BINANCE_WORKER_ENCRYPTION_KEY_FILE) must be set (generate with: openssl rand -hex 32)"
             .to_string()
     })?;
-    MasterKey::from_hex(&hex_key).map_err(|e| e.to_string())
+    let key = MasterKey::from_hex(&hex_key).map_err(|e| e.to_string())?;
+    // While the key is being rotated, the keys it replaces are still read.
+    match binance_worker::secrets::read_secret("BINANCE_WORKER_ENCRYPTION_KEY_PREVIOUS")? {
+        Some(previous) => key.with_previous(&previous).map_err(|e| e.to_string()),
+        None => Ok(key),
+    }
 }
 
 /// The collector's own A0 signing key (per the protocol specification:
@@ -293,8 +298,8 @@ async fn run_connect() -> Result<ConnectResponse, String> {
     if request.exchange.as_deref() == Some("ibkr") {
         let credentials = IbkrCredentials::new(&request.token, &request.query_id).map_err(|e| e.to_string())?;
         let client = open_ibkr(credentials).await?;
-        let stored_token = encrypt(&key, &request.token).map_err(|e| e.to_string())?;
-        let stored_query = encrypt(&key, &request.query_id).map_err(|e| e.to_string())?;
+        let stored_token = encrypt(&key, &request.token, &credential_context("ibkr", &request.account_id, "token")).map_err(|e| e.to_string())?;
+        let stored_query = encrypt(&key, &request.query_id, &credential_context("ibkr", &request.account_id, "query_id")).map_err(|e| e.to_string())?;
         let id = ibkr::insert_connection(&pool, &request.account_id, &stored_token, &stored_query)
             .await
             .map_err(|e| e.to_string())?;
@@ -312,8 +317,8 @@ async fn run_connect() -> Result<ConnectResponse, String> {
     if request.exchange.as_deref() == Some("coinbase") {
         let credentials = Credentials::new(request.key_name.trim(), &request.private_key).map_err(|e| e.to_string())?;
         let client = open_coinbase(credentials).await?;
-        let stored_name = encrypt(&key, request.key_name.trim()).map_err(|e| e.to_string())?;
-        let stored_key = encrypt(&key, &request.private_key).map_err(|e| e.to_string())?;
+        let stored_name = encrypt(&key, request.key_name.trim(), &credential_context("coinbase", &request.account_id, "key_name")).map_err(|e| e.to_string())?;
+        let stored_key = encrypt(&key, &request.private_key, &credential_context("coinbase", &request.account_id, "private_key")).map_err(|e| e.to_string())?;
         let id = coinbase::insert_connection(&pool, &request.account_id, &stored_name, &stored_key)
             .await
             .map_err(|e| e.to_string())?;
@@ -328,8 +333,8 @@ async fn run_connect() -> Result<ConnectResponse, String> {
         return Ok(ConnectResponse { connection_id: id.to_string(), summary: coinbase_summary(&pool, &connection).await? });
     }
 
-    let encrypted_key = encrypt(&key, &request.api_key).map_err(|e| e.to_string())?;
-    let encrypted_secret = encrypt(&key, &request.api_secret).map_err(|e| e.to_string())?;
+    let encrypted_key = encrypt(&key, &request.api_key, &credential_context("binance", &request.account_id, "api_key")).map_err(|e| e.to_string())?;
+    let encrypted_secret = encrypt(&key, &request.api_secret, &credential_context("binance", &request.account_id, "api_secret")).map_err(|e| e.to_string())?;
 
     let connection_id = db::insert_connection(
         &pool,
@@ -527,6 +532,34 @@ async fn run_rename() -> Result<RenameResponse, String> {
     }
     .map_err(|e| e.to_string())?;
     Ok(RenameResponse { label })
+}
+
+#[derive(Serialize)]
+struct DisconnectResponse {
+    removed: bool,
+    broker: &'static str,
+}
+
+/// Removes a connected account: its stored credential and, by cascade,
+/// everything collected for it. Nothing about it is kept.
+async fn run_disconnect() -> Result<DisconnectResponse, String> {
+    let request: StatusRequest = read_stdin_json()?;
+    let pool = pool().await?;
+    let (broker, removed) = match resolve(&pool, &request.account_id).await? {
+        Account::Binance(c) => ("binance", db::delete_connection(&pool, c.id).await),
+        Account::Coinbase(c) => ("coinbase", coinbase::delete_connection(&pool, c.id).await),
+        Account::Ibkr(c) => ("ibkr", ibkr::delete_connection(&pool, c.id).await),
+    };
+    Ok(DisconnectResponse { removed: removed.map_err(|e| e.to_string())?, broker })
+}
+
+/// Re-encrypts stored credentials into the current format under the current
+/// key (`credential-check` reports the same without changing anything).
+async fn run_rekey(write: bool) -> Result<binance_worker::rekey::RekeyReport, String> {
+    let key = master_key()?;
+    let pool = pool().await?;
+    let report = if write { binance_worker::rekey::rekey(&pool, &key).await } else { binance_worker::rekey::check(&pool, &key).await };
+    report.map_err(|e| e.to_string())
 }
 
 async fn run_status() -> Result<db::ConnectionSummary, String> {
@@ -867,8 +900,8 @@ fn decrypt_connection_credential(
 ) -> Option<(String, String)> {
     let nonce_key: [u8; 12] = connection.nonce_api_key.clone().try_into().ok()?;
     let nonce_secret: [u8; 12] = connection.nonce_api_secret.clone().try_into().ok()?;
-    let api_key = decrypt(key, &connection.encrypted_api_key, &nonce_key).ok()?;
-    let api_secret = decrypt(key, &connection.encrypted_api_secret, &nonce_secret).ok()?;
+    let api_key = decrypt(key, &connection.encrypted_api_key, &nonce_key, &credential_context("binance", &connection.account_id, "api_key")).ok()?;
+    let api_secret = decrypt(key, &connection.encrypted_api_secret, &nonce_secret, &credential_context("binance", &connection.account_id, "api_secret")).ok()?;
     Some((api_key, api_secret))
 }
 
@@ -1024,6 +1057,9 @@ async fn main() {
         "status" => print_result(run_status().await),
         "list" => print_result(run_list().await),
         "rename" => print_result(run_rename().await),
+        "disconnect" => print_result(run_disconnect().await),
+        "rekey" => print_result(run_rekey(true).await),
+        "credential-check" => print_result(run_rekey(false).await),
         "sync" => print_result(run_sync().await),
         "series" => print_result(run_series().await),
         "nav" => print_result(run_nav().await),

@@ -149,7 +149,7 @@ describe("identitySignature.verify", () => {
     const keyPair = await generateKeyPair();
     credentialStore.register(subjectKey, bytesToHex(keyPair.qx), bytesToHex(keyPair.qy), "vault");
 
-    const challenge = beginChallenge();
+    const challenge = await beginChallenge();
     const rawSignature = new Uint8Array(
       await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, keyPair.privateKey, new TextEncoder().encode(challenge)),
     );

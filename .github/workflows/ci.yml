@@ -5,18 +5,24 @@ name: ci
 
 on:
   push:
-    branches: [master, main]
+    branches: [main, dev]
   pull_request:
+
+# Jobs that only type-check or run tests that never execute the zkVM guest set
+# RISC0_SKIP_BUILD, so they do not need the RISC Zero toolchain. Only the `zk`
+# job installs it and builds the guest.
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RISC0_SKIP_BUILD: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.22.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24.18.0"
           cache: pnpm
@@ -30,14 +36,14 @@ jobs:
   bootstrap-binance:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: make bootstrap-binance
 
   bootstrap-zk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - name: install RISC Zero toolchain
         run: |
@@ -52,9 +58,11 @@ jobs:
 
   rust:
     runs-on: ubuntu-latest
+    env:
+      RISC0_SKIP_BUILD: "1"
     needs: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: make check-rust
 
@@ -62,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.8.1
@@ -71,6 +79,8 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    env:
+      RISC0_SKIP_BUILD: "1"
     needs: build
     services:
       postgres:
@@ -87,11 +97,11 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.22.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24.18.0"
           cache: pnpm
@@ -121,11 +131,11 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.22.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24.18.0"
           cache: pnpm
@@ -135,6 +145,10 @@ jobs:
       - run: make contracts-deps
       - run: forge build --root contracts
       - run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --manifest-path services/Cargo.toml -p binance-worker
+        env:
+          RISC0_SKIP_BUILD: "1"
       - run: pnpm --filter e2e-tests exec playwright install --with-deps chromium
       - run: make check-e2e
 
@@ -142,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - name: install RISC Zero toolchain
         run: |
@@ -155,11 +169,11 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.22.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24.18.0"
           cache: pnpm

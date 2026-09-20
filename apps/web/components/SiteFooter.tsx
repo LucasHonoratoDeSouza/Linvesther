@@ -1,5 +1,6 @@
 import { Brand } from "./Brand";
 import { Icon } from "./Icon";
+import { REPO_URL } from "./GitHubLink";
 
 export function SiteFooter() {
   return (
@@ -17,7 +18,7 @@ export function SiteFooter() {
           <div>
             <span className="eyebrow">Product</span>
             <a href="/portfolio">Portfolio</a>
-            <a href="/disclose">Create a claim</a>
+            <a href="/claims">Create a claim</a>
             <a href="/explorer">Explorer</a>
           </div>
           <div>
@@ -27,6 +28,9 @@ export function SiteFooter() {
             </a>
             <a href="/whitepaper">Whitepaper</a>
             <a href="/docs/concepts#verification">Verification model</a>
+            <a href={REPO_URL} target="_blank" rel="noreferrer">
+              Source on GitHub <Icon name="diagonal" width={12} />
+            </a>
           </div>
           <div>
             <span className="eyebrow">Your account</span>

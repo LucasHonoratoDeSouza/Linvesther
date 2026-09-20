@@ -17,6 +17,20 @@ export interface BroadcastClient {
 // and lets a real out-of-gas failure surface on its own.
 const DEFAULT_LOW_BALANCE_THRESHOLD_WEI = 10_000_000_000_000_000n;
 
+/** Thrown instead of broadcasting when the relayer cannot pay for the
+ * transaction. A clear refusal up front, so a person is told to try later
+ * instead of watching a transaction fail halfway. */
+export class RelayerUnderfundedError extends Error {
+  /** A stable code and status for a caller to report. */
+  readonly publicCode = "relayer_underfunded";
+  readonly statusCode = 503;
+
+  constructor(readonly balanceWei: bigint, readonly minBalanceWei: bigint) {
+    super(`the relayer's balance (${balanceWei} wei) is below its floor (${minBalanceWei} wei)`);
+    this.name = "RelayerUnderfundedError";
+  }
+}
+
 /** Broadcasts `RelayRequest`s idempotently: a repeated call for a
  * `dedupKey` already broadcast recovers the existing tx/nonce rather
  * than transmitting a new payload — see
@@ -32,6 +46,8 @@ export class Relayer {
     private readonly client: BroadcastClient,
     private readonly store: RelayStore,
     private readonly lowBalanceThresholdWei: bigint = DEFAULT_LOW_BALANCE_THRESHOLD_WEI,
+    /** Below this the relayer refuses to broadcast. 0 disables the floor. */
+    private readonly minBalanceWei: bigint = 0n,
   ) {}
 
   async relay(request: RelayRequest): Promise<`0x${string}`> {
@@ -45,6 +61,9 @@ export class Relayer {
 
     const address = this.client.address();
     const balance = await this.client.getBalance(address);
+    if (balance < this.minBalanceWei) {
+      throw new RelayerUnderfundedError(balance, this.minBalanceWei);
+    }
     if (balance < this.lowBalanceThresholdWei) {
       console.warn(`relayer ${address} balance is low (${balance} wei, threshold ${this.lowBalanceThresholdWei} wei) — it may soon be unable to relay`);
     }

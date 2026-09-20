@@ -146,6 +146,7 @@ fn signed_input(envelope: SourceEnvelope, nav: Vec<i64>, ledger_deltas: Vec<i64>
 /// and the receipt only verifies against its own real image ID — never
 /// against an arbitrary one.
 #[test]
+#[ignore = "real RISC Zero proving uses about 9 GB of RAM and many minutes even for this small input; run it explicitly with `cargo test -p zkvm-methods --test guest_test -- --ignored` on a machine with headroom (see the issue on reducing proving memory)"]
 fn a_real_proof_verifies_and_its_journal_is_tamper_evident() {
     let input = signed_input(
         base_envelope(),

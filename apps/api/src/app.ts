@@ -13,12 +13,16 @@ import type {
 } from "@simplewebauthn/server";
 import Fastify, { type FastifyInstance } from "fastify";
 import { concat, getAddress, keccak256, slice } from "viem";
-import { RateLimiter } from "./auth/rateLimiter.js";
+import { RateLimiter, type RateLimit } from "./auth/rateLimiter.js";
 import { registerErrorHandler } from "./security/errors.js";
 import { registerResponseHeaders } from "./security/responseHeaders.js";
 import { registerTrafficLimits } from "./security/trafficLimits.js";
 import { requireSession } from "./auth/requireSession.js";
-import { MemorySessionStore, SESSION_TTL_MS, type SessionStore } from "./auth/sessionStore.js";
+import {
+  MemorySessionStore,
+  SESSION_TTL_MS,
+  type SessionStore,
+} from "./auth/sessionStore.js";
 import { credentialStore } from "./auth/identitySignature.js";
 import {
   beginChallenge,
@@ -58,7 +62,7 @@ export interface AppOptions {
   corsOrigins?: string[];
   sessionStore?: SessionStore;
   /** Caps how often one session can start a real proof (CPU/RAM-heavy). */
-  proofRateLimiter?: RateLimiter;
+  proofRateLimiter?: RateLimit;
   /** Where a claim is checked against the owner's current figures. Defaults to the combined record read from the connected accounts. */
   currentClaimMetrics?: ClaimsRouteOptions["currentMetrics"];
   /** Marks the session cookie `Secure` — set whenever the API is served over HTTPS. */
@@ -69,6 +73,10 @@ export interface AppOptions {
   trustProxyHops?: number;
   /** Gas-paying actions the operator will fund per hour across all clients. */
   relayBudgetPerHour?: number;
+  /** Where traffic-limit counts live: in memory unless a shared store is given. */
+  limiterFactory?: (name: string, max: number, windowMs: number) => RateLimit;
+  /** Scales every traffic limit. For a test environment only; leave unset in production. */
+  limitMultiplier?: number;
   /** accountId -> the only address allowed to read it. */
   accountOwners?: Map<string, `0x${string}`>;
   /** Real on-chain identity lifecycle deps (Anvil/testnet + Postgres +
@@ -106,7 +114,9 @@ function deriveSubjectKey(qx: `0x${string}`, qy: `0x${string}`): `0x${string}` {
 
 /** Trusts only the nearest `hops` proxies, so a client cannot choose its own
  * address by sending a forged forwarding header. */
-function trustHops(hops: number | undefined): false | ((address: string, hop: number) => boolean) {
+function trustHops(
+  hops: number | undefined,
+): false | ((address: string, hop: number) => boolean) {
   return hops && hops > 0 ? (_address, hop) => hop < hops : false;
 }
 
@@ -140,14 +150,22 @@ export function buildApp(options: AppOptions): FastifyInstance {
     options.binanceWorkerBinaryPath ?? "services/target/debug/binance-worker";
   const now = options.now ?? (() => new Date());
 
-  const app = Fastify({ bodyLimit: options.bodyLimitBytes ?? 1024 * 1024, trustProxy: trustHops(options.trustProxyHops) });
+  const app = Fastify({
+    bodyLimit: options.bodyLimitBytes ?? 1024 * 1024,
+    trustProxy: trustHops(options.trustProxyHops),
+  });
   // No logger is configured (tests would otherwise be noisy), so an
   // unhandled route error would otherwise vanish entirely — the client
   // only ever sees Fastify's generic "Internal Server Error" body, with
   // nothing server-side to diagnose it from.
   registerErrorHandler(app);
   registerResponseHeaders(app);
-  registerTrafficLimits(app, { now, relayBudgetPerHour: options.relayBudgetPerHour });
+  registerTrafficLimits(app, {
+    now,
+    relayBudgetPerHour: options.relayBudgetPerHour,
+    limitMultiplier: options.limitMultiplier,
+    limiterFactory: options.limiterFactory,
+  });
 
   // A browser always names the page a state-changing request came from, so
   // a request from an origin the API does not serve is refused even though
@@ -192,19 +210,21 @@ export function buildApp(options: AppOptions): FastifyInstance {
     trackOwners: multiAccountTrackOwners,
     now,
   });
-  registerBinanceConnectRoutes(app, {
-    sessionStore,
-    accountOwners,
-    workerBinaryPath: binanceWorkerBinaryPath,
-    proofRateLimiter,
-    now,
-  });
   const profileSettings =
     options.profileSettingsStore ?? new MemorySettingsStore();
   const publicProfiles = new PublicProfileService({
     workerBinaryPath: binanceWorkerBinaryPath,
     settings: profileSettings,
     now,
+  });
+  registerBinanceConnectRoutes(app, {
+    sessionStore,
+    accountOwners,
+    workerBinaryPath: binanceWorkerBinaryPath,
+    proofRateLimiter,
+    now,
+    onAccountRemoved: (owner, accountId) =>
+      publicProfiles.forgetAccount(owner, accountId),
   });
   registerProfileRoutes(app, {
     sessionStore,
@@ -255,7 +275,12 @@ export function buildApp(options: AppOptions): FastifyInstance {
         return reply.code(401).send({ error: "signature_invalid" });
       }
       const subjectKey = deriveSubjectKey(result.qx, result.qy);
-      await credentialStore.register(subjectKey, result.qx, result.qy, "webauthn");
+      await credentialStore.register(
+        subjectKey,
+        result.qx,
+        result.qy,
+        "webauthn",
+      );
       const session = await sessionStore.create(subjectKey);
       reply.setCookie("sid", session.id, sessionCookie);
       // The client only ever sees the WebAuthn credential's opaque id/rawId,
@@ -309,7 +334,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
   });
 
   app.post("/auth/vault/challenge", async () => ({
-    challenge: beginChallenge(),
+    challenge: await beginChallenge(),
   }));
 
   app.post<{

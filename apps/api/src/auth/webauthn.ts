@@ -38,8 +38,15 @@ const DEFAULT_CONFIG: WebAuthnConfig = {
 // (two ceremonies, two single-use nonce pools), same "issue once, consume
 // once" pattern as nonceStore.ts, reused as its own instances here since
 // the library needs a predicate function rather than an explicit value.
-const registrationChallenges: NonceStore = new MemoryNonceStore();
-const authenticationChallenges: NonceStore = new MemoryNonceStore();
+let registrationChallenges: NonceStore = new MemoryNonceStore();
+let authenticationChallenges: NonceStore = new MemoryNonceStore();
+
+/** Chooses where passkey challenges are kept. In memory by default; a
+ * deployment with a database passes shared stores. */
+export function useWebAuthnNonceStores(stores: { registration: NonceStore; authentication: NonceStore }): void {
+  registrationChallenges = stores.registration;
+  authenticationChallenges = stores.authentication;
+}
 
 // Keyed by WebAuthn credential ID (not subjectKey) — this is bookkeeping
 // internal to the ceremony (the library needs a credential's COSE public
@@ -87,7 +94,7 @@ export async function beginRegistration(
   userName: string,
   config: WebAuthnConfig = DEFAULT_CONFIG,
 ): Promise<PublicKeyCredentialCreationOptionsJSON> {
-  const challenge = registrationChallenges.issue();
+  const challenge = await registrationChallenges.issue();
   return generateRegistrationOptions({
     rpName: config.rpName,
     rpID: config.rpID,
@@ -146,7 +153,7 @@ export async function finishRegistration(
 export async function beginAuthentication(
   config: WebAuthnConfig = DEFAULT_CONFIG,
 ): Promise<PublicKeyCredentialRequestOptionsJSON> {
-  const challenge = authenticationChallenges.issue();
+  const challenge = await authenticationChallenges.issue();
   return generateAuthenticationOptions({ rpID: config.rpID, challenge });
 }
 

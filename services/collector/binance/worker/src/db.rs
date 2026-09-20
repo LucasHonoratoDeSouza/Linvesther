@@ -350,6 +350,16 @@ pub async fn connection_created_at_ms(pool: &PgPool, connection_id: Uuid) -> Res
 
 /// A person's own name for a connection ("Main", "Long-term", ...) —
 /// only how they tell several connected accounts apart.
+/// Deletes the stored credential and, by cascade, everything collected for it
+/// (trades, flows, catalog). Returns whether a connection was removed.
+pub async fn delete_connection(pool: &PgPool, connection_id: Uuid) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM binance_connections WHERE id = $1")
+        .bind(connection_id)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
 pub async fn set_connection_label(pool: &PgPool, connection_id: Uuid, label: &str) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE binance_connections SET label = $2 WHERE id = $1")
         .bind(connection_id)

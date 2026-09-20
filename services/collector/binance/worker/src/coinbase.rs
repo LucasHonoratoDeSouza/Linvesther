@@ -8,7 +8,7 @@
 //! don't explain must have come from outside — a deposit if the balance
 //! rose, a withdrawal if it fell.
 
-use crate::crypto::{decrypt, EncryptedField, MasterKey};
+use crate::crypto::{credential_context, decrypt, EncryptedField, MasterKey};
 use binance_flows::{AssetLeg, FlowFamily, NormalizedFlow};
 use binance_trades::Trade;
 use chrono::{DateTime, Utc};
@@ -45,8 +45,8 @@ pub struct CoinbaseConnection {
 pub fn credentials(key: &MasterKey, connection: &CoinbaseConnection) -> Result<Credentials, String> {
     let nonce_name: [u8; 12] = connection.nonce_key_name.clone().try_into().map_err(|_| "corrupt stored key name")?;
     let nonce_key: [u8; 12] = connection.nonce_private_key.clone().try_into().map_err(|_| "corrupt stored private key")?;
-    let key_name = decrypt(key, &connection.encrypted_key_name, &nonce_name).map_err(|e| e.to_string())?;
-    let private_key = decrypt(key, &connection.encrypted_private_key, &nonce_key).map_err(|e| e.to_string())?;
+    let key_name = decrypt(key, &connection.encrypted_key_name, &nonce_name, &credential_context("coinbase", &connection.account_id, "key_name")).map_err(|e| e.to_string())?;
+    let private_key = decrypt(key, &connection.encrypted_private_key, &nonce_key, &credential_context("coinbase", &connection.account_id, "private_key")).map_err(|e| e.to_string())?;
     Credentials::new(&key_name, &private_key).map_err(|e| e.to_string())
 }
 
@@ -81,6 +81,15 @@ pub async fn insert_connection(
     .fetch_one(pool)
     .await?;
     Ok(row.0)
+}
+
+/// Deletes the stored credential and, by cascade, everything collected for it.
+pub async fn delete_connection(pool: &PgPool, connection_id: Uuid) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM coinbase_connections WHERE id = $1")
+        .bind(connection_id)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
 }
 
 pub async fn set_label(pool: &PgPool, connection_id: Uuid, label: &str) -> Result<(), sqlx::Error> {

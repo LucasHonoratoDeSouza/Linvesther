@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy } from "./lib/contentSecurityPolicy";
+import { isStaticAsset } from "./lib/staticAssets";
 
 // Splits the landing page, the app (portfolio/explorer/disclose/…) and
 // the docs (whitepaper/docs) across three subdomains of the same
@@ -40,6 +41,8 @@ export function middleware(request: NextRequest) {
   });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  // Lets the layout name each page's own address (its canonical URL).
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
   requestHeaders.set("content-security-policy", policy);
   const withPolicy = (response: NextResponse) => {
     response.headers.set("content-security-policy", policy);
@@ -49,6 +52,10 @@ export function middleware(request: NextRequest) {
     withPolicy(NextResponse.next({ request: { headers: requestHeaders } }));
 
   if (!ROOT_DOMAIN) return next();
+  // Files from public/ are served as they are on every host. Redirecting them to
+  // the apex made the browser fetch them cross-origin, which the page's
+  // Content-Security-Policy blocks: broker logos and images went missing.
+  if (isStaticAsset(request.nextUrl.pathname)) return next();
 
   const host = request.headers.get("host") ?? "";
   if (!host.endsWith(ROOT_DOMAIN)) return next();
@@ -71,20 +78,10 @@ export function middleware(request: NextRequest) {
     new URL(
       `${request.nextUrl.protocol}//${targetHost}${path}${request.nextUrl.search}`,
     );
-  // Same-host: only the pathname changes, so a plain relative rewrite
-  // (no host reassignment) is enough, and avoids Next treating it as an
-  // external URL it would need to fetch itself.
-  const rewriteTo = (path: string) =>
-    withPolicy(
-      NextResponse.rewrite(new URL(path, request.url), {
-        request: { headers: requestHeaders },
-      }),
-    );
-
   if (subdomain === "app") {
     if (zone === "docs")
       return NextResponse.redirect(to(`docs.${ROOT_DOMAIN}`, pathname));
-    if (zone === "landing" && pathname === "/") return rewriteTo("/portfolio");
+    if (zone === "landing" && pathname === "/") return next(); // "/" is rewritten to /portfolio in next.config.mjs
     if (zone === "landing")
       return NextResponse.redirect(to(ROOT_DOMAIN, pathname));
     return next();
@@ -92,7 +89,7 @@ export function middleware(request: NextRequest) {
   if (subdomain === "docs") {
     if (zone === "app")
       return NextResponse.redirect(to(`app.${ROOT_DOMAIN}`, pathname));
-    if (zone === "landing" && pathname === "/") return rewriteTo("/docs");
+    if (zone === "landing" && pathname === "/") return next(); // "/" is rewritten to /docs in next.config.mjs
     if (zone === "landing")
       return NextResponse.redirect(to(ROOT_DOMAIN, pathname));
     return next();

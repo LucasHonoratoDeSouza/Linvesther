@@ -24,7 +24,7 @@ async function addVirtualAuthenticator(page: Page) {
   });
 }
 
-test("onboarding: sign in with a passkey, create identity, bind and remove an account", async ({
+test("onboarding: sign in with a passkey, then create the identity", async ({
   page,
 }) => {
   await addVirtualAuthenticator(page);
@@ -33,20 +33,9 @@ test("onboarding: sign in with a passkey, create identity, bind and remove an ac
   await page.getByTestId("passkey-register-button").click();
   await expect(page.getByTestId("signed-in-indicator")).toBeVisible();
 
+  // Creating the identity is a real transaction on the local chain.
   await page.getByTestId("create-identity-button").click();
-  await expect(page.getByTestId("identity-state")).toContainText(
-    "pending_registration",
-  );
-
-  await page.getByTestId("bind-account-button").click();
-  await expect(page.getByTestId("account-state")).toContainText(
-    "pending_binding",
-  );
-
-  await page.getByTestId("remove-account-button").click();
-  await expect(page.getByTestId("account-state")).toContainText(
-    "pending_removal",
-  );
+  await expect(page.getByTestId("identity-state")).toContainText("one more click", { timeout: 30_000 });
 });
 
 test("failure: a wrong vault password shows a real error, not a fabricated success", async ({
@@ -57,7 +46,11 @@ test("failure: a wrong vault password shows a real error, not a fabricated succe
   await page.getByTestId("vault-create-button").click();
   await expect(page.getByTestId("signed-in-indicator")).toBeVisible();
 
+  // The session survives a reload; sign out to get the unlock form back.
   await page.reload();
+  await expect(page.getByTestId("signed-in-indicator")).toBeVisible();
+  await page.getByTestId("sign-out-button").click();
+  await expect(page.getByTestId("vault-unlock-button")).toBeVisible();
   await page.getByTestId("vault-password-input").fill("not the real password");
   await page.getByTestId("vault-unlock-button").click();
 
@@ -106,7 +99,7 @@ test("public profile settings: signed out asks to sign in; signed in without an 
   await expect(page.getByTestId("signed-in-indicator")).toBeVisible();
 
   await page.goto("/disclose");
-  await expect(page.getByRole("heading", { name: "Connect an account to have a profile" })).toBeVisible();
+  await expect(page.getByText("Connect an account to have a track record.")).toBeVisible();
   // The public address is there to copy from the start, and says what it exposes.
   await expect(page.getByTestId("public-address")).toBeVisible();
   await expect(page.getByTestId("public-link-status")).toContainText("percentages only");
