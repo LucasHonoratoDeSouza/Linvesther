@@ -17,7 +17,7 @@
     "start": "tsx src/server.ts"
   },
   "dependencies": {
-    "@fastify/cookie": "11.0.2",
+    "@fastify/cookie": "11.1.2",
     "@fastify/cors": "11.1.0",
     "@linvestherzk/chain-worker": "workspace:*",
     "@simplewebauthn/server": "14.0.2",
