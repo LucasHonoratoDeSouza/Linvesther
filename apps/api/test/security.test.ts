@@ -254,3 +254,12 @@ describe("the worker process", () => {
     await expect(invokeWorker({ binaryPath: path }, "list", "{}")).resolves.toBeDefined();
   });
 });
+
+describe("liveness", () => {
+  it("answers without a session and says nothing about the deployment", async () => {
+    const { app } = await appWithSession();
+    const response = await app.inject({ method: "GET", url: "/healthz" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+  });
+});

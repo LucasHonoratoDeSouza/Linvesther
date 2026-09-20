@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for a new Linvesther commit
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

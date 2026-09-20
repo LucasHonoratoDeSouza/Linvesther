@@ -6,6 +6,36 @@ All notable changes are recorded here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- `www.` and plain-http requests are redirected (308) to the canonical https
+  address, so search engines do not index the same page twice.
+
+- The landing page walkthrough video no longer has a soundtrack, so its sound
+  button is gone.
+
+### Added
+
+- Four guides in the documentation (verifiable track records, zero-knowledge
+  performance, proving performance without revealing trades, and a comparison of
+  verification approaches), each with `TechArticle` structured data.
+- One-sentence definition of the project, used by the site metadata, `llms.txt`,
+  the README and the repository description.
+- `CITATION.cff` and `.zenodo.json`, so the project can be cited and archived
+  with a DOI.
+- Visits that carry `?utm_source=` (for example from ChatGPT search) are counted
+  and appear in the server report.
+
+- `deploy/server/probe.py` records a health sample every minute (public addresses
+  through the tunnel, services, database, tunnel request counters, machine load,
+  memory and disk), and `report.py` summarises availability, outages, reboots,
+  latency and traffic peaks.
+
+- `deploy/server`: production services (API, web, tunnel, Postgres) as user
+  `systemd` units and a pull-based deploy that ships a commit only after its CI
+  passed, keeps the previous build, and rolls back on a failed health check.
+- `GET /healthz` on the API, a liveness check with no side effects.
+
 ### Security
 
 - Stored exchange credentials are now bound to their broker, account and field

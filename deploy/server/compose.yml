@@ -1,0 +1,21 @@
+# The production database. Reachable from this machine only.
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: linvestherzk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the env file}
+      POSTGRES_DB: linvestherzk
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - linvesther-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U linvestherzk"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+volumes:
+  linvesther-pgdata:

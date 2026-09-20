@@ -167,6 +167,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
     limiterFactory: options.limiterFactory,
   });
 
+  // Answers whether this process is up, for a deploy or a monitor to check.
+  // It reveals nothing and touches no store.
+  app.get("/healthz", async () => ({ ok: true }));
+
   // A browser always names the page a state-changing request came from, so
   // a request from an origin the API does not serve is refused even though
   // it carries the person's cookie. Sign-in itself has no session yet.

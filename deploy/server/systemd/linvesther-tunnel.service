@@ -1,0 +1,11 @@
+[Unit]
+Description=Linvesther Cloudflare tunnel
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/cloudflared --no-autoupdate --config %h/linvesther/shared/cloudflared.yml tunnel --metrics 127.0.0.1:20241 run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

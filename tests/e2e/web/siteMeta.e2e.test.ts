@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { docsOriginOf, jsonLdScript, llmsTxt, originOf, organizationJsonLd, REPOSITORY, robotsFor, securityTxt, sitemapPaths, zoneOfHost } from "../../../apps/web/lib/siteMeta";
+import { docsOriginOf, jsonLdScript, llmsTxt, originOf, organizationJsonLd, REPOSITORY, robotsFor, securityTxt, sitemapPaths, zoneOfHost, DEFINITION, techArticleJsonLd } from "../../../apps/web/lib/siteMeta";
 
 const ROOT = "example.test";
 
@@ -79,5 +79,27 @@ describe("structured data", () => {
 
   it("cannot close its own script tag", () => {
     expect(jsonLdScript({ name: "</script><script>alert(1)</script>" })).not.toContain("</script>");
+  });
+});
+
+describe("what the site says it is", () => {
+  it("opens the llms.txt summary with the one-sentence definition", () => {
+    expect(DEFINITION).toContain("open-source protocol");
+    expect(llmsTxt("https://docs.example.test", "https://example.test")).toContain(`> ${DEFINITION}`);
+  });
+
+  it("describes a documentation page as a technical article at its own address", () => {
+    const article = techArticleJsonLd("https://docs.example.test", {
+      href: "/docs/faq",
+      label: "FAQ",
+      description: "Answers.",
+    }) as Record<string, unknown>;
+    expect(article["@type"]).toBe("TechArticle");
+    expect(article.url).toBe("https://docs.example.test/docs/faq");
+    expect(article.description).toBe("Answers.");
+  });
+
+  it("lists every guide in the docs sitemap", () => {
+    expect(sitemapPaths("docs")).toContain("/docs/track-record-verification-approaches");
   });
 });

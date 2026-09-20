@@ -1,0 +1,11 @@
+{
+  "title": "Linvesther: privacy-preserving, verifiable investment track records",
+  "upload_type": "software",
+  "description": "Linvesther is an open-source protocol for privacy-preserving, verifiable investment track records. It turns a real track record into public claims anyone can check, without publishing a balance, a position or a trade.",
+  "creators": [{ "name": "Honorato de Souza, Lucas" }],
+  "license": "Apache-2.0",
+  "keywords": ["zero-knowledge proofs", "track record", "verifiable performance", "RISC Zero", "privacy"],
+  "related_identifiers": [
+    { "identifier": "https://linvesther.com", "relation": "isDocumentedBy", "scheme": "url" }
+  ]
+}

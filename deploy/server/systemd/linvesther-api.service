@@ -1,0 +1,17 @@
+[Unit]
+Description=Linvesther API
+After=network-online.target docker.service
+
+[Service]
+WorkingDirectory=%h/linvesther/repo/apps/api
+EnvironmentFile=%h/linvesther/shared/.env
+EnvironmentFile=%h/linvesther/repo/deploy/server/settings.env
+Environment=PORT=4301
+Environment=PATH=%h/.local/opt/node-v24.18.0-linux-x64/bin:/usr/local/bin:/usr/bin:/bin
+Environment=BINANCE_WORKER_BINARY_PATH=%h/linvesther/current-worker
+ExecStart=%h/.local/opt/node-v24.18.0-linux-x64/bin/node node_modules/tsx/dist/cli.mjs src/server.ts
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
