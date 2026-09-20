@@ -89,6 +89,30 @@ describe("PostgresProjectionStore against real Anvil + real Postgres", () => {
     expect(identityAfterRestart).toEqual(identity);
   }, 30_000);
 
+  it("reading the same block again after a restart changes nothing and does not fail", async () => {
+    const store = newStore();
+    const publicClient = createPublicClient({ transport: http(chain.rpcUrl) });
+    const deployerAccount = privateKeyToAccount(DEPLOYER_KEY);
+    const wallet = createWalletClient({ account: deployerAccount, transport: http(chain.rpcUrl) });
+    const hash = await wallet.writeContract({
+      chain: undefined,
+      address: chain.identityRegistry,
+      abi: identityRegistryAbi,
+      functionName: "createIdentity",
+      args: [0],
+    });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
+    const indexed = { header: { number: receipt.blockNumber, hash: block.hash!, parentHash: block.parentHash }, tag: "included" as const };
+
+    await store.apply(indexed);
+    // A restarted process resumes at the highest block it stored, which it then reads again.
+    await newStore().apply(indexed);
+
+    const { rows } = await pool.query("SELECT count(*)::int AS n FROM identities");
+    expect(rows[0].n).toBe(1);
+  }, 30_000);
+
   it("full create -> propose -> confirm flow ends with the new owner active, read back correctly", async () => {
     const store = newStore();
     const publicClient = createPublicClient({ transport: http(chain.rpcUrl) });

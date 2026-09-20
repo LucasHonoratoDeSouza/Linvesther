@@ -38,6 +38,14 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: TITLE, template: "%s | Linvesther" },
     description: DESCRIPTION,
     alternates: { canonical: pathname },
+    // Search engines ask for a favicon whose side is a multiple of 48 pixels.
+    icons: {
+      icon: [
+        { url: "/icons/icon-48.png", sizes: "48x48", type: "image/png" },
+        { url: "/icons/icon-96.png", sizes: "96x96", type: "image/png" },
+        { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      ],
+    },
     openGraph: {
       type: "website",
       siteName: "Linvesther",

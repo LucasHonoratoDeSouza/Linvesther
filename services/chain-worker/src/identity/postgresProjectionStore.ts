@@ -78,14 +78,16 @@ export class PostgresProjectionStore implements ProjectionStore {
       case "IdentityCreated":
         await this.pool.query(
           `INSERT INTO identities (identity_id, owner, pending_owner, owner_epoch, state, created_at_block)
-           VALUES ($1, $2, NULL, 0, 'pending_confirmation', $3)`,
+           VALUES ($1, $2, NULL, 0, 'pending_confirmation', $3)
+           ON CONFLICT (identity_id) DO NOTHING`,
           [event.identityId, event.owner, blockNumber.toString()],
         );
         return;
       case "TrackCreated":
         await this.pool.query(
           `INSERT INTO tracks (track_id, identity_id, financial_profile_id, denomination_commitment, created_at_block)
-           VALUES ($1, $2, $3, $4, $5)`,
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (track_id) DO NOTHING`,
           [event.trackId, event.identityId, event.financialProfileId, event.denominationCommitment, blockNumber.toString()],
         );
         return;
@@ -104,7 +106,8 @@ export class PostgresProjectionStore implements ProjectionStore {
       case "AccountRegistered":
         await this.pool.query(
           `INSERT INTO accounts (account_id, track_id, venue_id, state, created_at_block)
-           VALUES ($1, $2, $3, 'pending_baseline', $4)`,
+           VALUES ($1, $2, $3, 'pending_baseline', $4)
+           ON CONFLICT (account_id) DO NOTHING`,
           [event.accountId, event.trackId, event.venueId, blockNumber.toString()],
         );
         return;

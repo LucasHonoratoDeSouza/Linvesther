@@ -6,7 +6,22 @@ All notable changes are recorded here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- Creating an identity failed with `internal_error` right after the API had been
+  restarted. The indexer resumes at the highest block it stored and read that
+  block's events again, and inserting an identity, track or account twice was an
+  error. Those inserts now ignore a row that already exists, and overlapping
+  syncs run one after another instead of walking the same blocks together.
+
+- "Activate my account" did nothing after the page was reloaded: the password's
+  key lives only in the page's memory, and the button returned without a word
+  when it was gone. It now says to sign in with the password again.
+
 ### Changed
+
+- The site declares 48, 96 and 192 pixel icons, the sizes search engines accept
+  for the icon next to a result (the existing ones were 16, 32 and 512).
 
 - `www.` and plain-http requests are redirected (308) to the canonical https
   address, so search engines do not index the same page twice.

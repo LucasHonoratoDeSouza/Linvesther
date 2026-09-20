@@ -16,6 +16,8 @@ function tagFor(number: bigint, snapshot: ChainSnapshot): BlockTag {
 
 export class Indexer {
   private chain: IndexedBlock[] = [];
+  // Requests that resync at the same moment must not both walk the same blocks.
+  private running: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly projections: ProjectionStore) {}
 
@@ -29,7 +31,13 @@ export class Indexer {
   /** Runs one polling tick. `fromNumber` only matters for the very first
    * call (cold start, nothing indexed yet); later calls always
    * reconcile from wherever the local view currently is. */
-  async sync(client: ChainClient, fromNumber: bigint): Promise<ReorgReport | null> {
+  sync(client: ChainClient, fromNumber: bigint): Promise<ReorgReport | null> {
+    const turn = this.running.then(() => this.syncOnce(client, fromNumber));
+    this.running = turn.catch(() => undefined);
+    return turn;
+  }
+
+  private async syncOnce(client: ChainClient, fromNumber: bigint): Promise<ReorgReport | null> {
     const snapshot = await client.getSnapshot();
 
     if (this.chain.length === 0) {
