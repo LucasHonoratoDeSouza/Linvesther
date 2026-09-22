@@ -6,6 +6,11 @@ All notable changes are recorded here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- `thiserror` upgraded from 1 to 2 across every Rust crate (none of them are on
+  the zkVM guest's dependency path, so no proof's image identifier changes).
+
 ### Fixed
 
 - Creating an identity failed with `internal_error` right after the API had been
