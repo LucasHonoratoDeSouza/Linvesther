@@ -286,7 +286,7 @@ export function registerBinanceConnectRoutes(app: FastifyInstance, options: Bina
     }
     const proof = await verifyWalletProof(options.walletProof, { accountId: request.params.accountId, message, signature });
     if (!proof.ok) {
-      return reply.code(422).send({ error: "wallet_proof_failed", reason: proof.reason });
+      return reply.code(422).send({ error: "wallet_proof_failed", reason: proof.reason, detail: proof.reason });
     }
     try {
       const result = await invokeWorker<BinanceConnectResult>(
