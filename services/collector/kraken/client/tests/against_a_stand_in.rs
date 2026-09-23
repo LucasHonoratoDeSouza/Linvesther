@@ -153,7 +153,7 @@ fn a_key_missing_a_read_permission_is_told_which_one() {
     let server = stand_in(|path, body| if path == "/0/private/Ledgers" { DENIED.into() } else { read_only_key(path, body) });
     match client(&server).ensure_read_only() {
         Err(KrakenError::MissingPermission { permission, said }) => {
-            assert!(permission.contains("Query ledger entries") && permission.contains("Other"), "{permission}");
+            assert!(permission.contains("Query ledger entries") && permission.contains("Data"), "{permission}");
             assert!(said.contains("Permission denied"), "Kraken's own words are kept: {said}");
         }
         other => panic!("expected MissingPermission, got {other:?}"),

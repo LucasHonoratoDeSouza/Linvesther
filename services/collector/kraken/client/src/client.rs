@@ -279,10 +279,10 @@ impl KrakenClient {
     /// named, so the person knows which box to tick.
     pub fn ensure_can_read(&self) -> Result<(), KrakenError> {
         // Where each one sits in Kraken's key form is part of the message: the ledger
-        // permission is under "Other", away from the funds and orders ones, and is easy to miss.
+        // permission is under "Data", away from the funds and orders ones, and is easy to miss.
         self.require("“Query funds” (under Funds)", "/0/private/BalanceEx", &[])?;
         self.require("query trades: tick “Query open orders & trades” and “Query closed orders & trades” (under Orders and trades)", "/0/private/TradesHistory", &[("ofs", "0".into())])?;
-        self.require("“Query ledger entries” (under Other)", "/0/private/Ledgers", &[("ofs", "0".into())])
+        self.require("“Query ledger entries” (under Data)", "/0/private/Ledgers", &[("ofs", "0".into())])
     }
 
     /// The key cannot place orders or withdraw. Kraken has no way to ask a key what
