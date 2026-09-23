@@ -54,7 +54,16 @@ const nextConfig = {
     return hostRewrites(process.env.ROOT_DOMAIN);
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The video and its poster are static files (unlike public/images/*,
+      // which the /_next/image optimizer already caches long — see above),
+      // so without this they were re-sent in full on every visit.
+      {
+        source: "/video/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
   },
 };
 
