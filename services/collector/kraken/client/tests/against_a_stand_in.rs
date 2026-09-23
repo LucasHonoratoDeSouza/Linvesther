@@ -88,7 +88,9 @@ fn read_only_key(path: &str, _body: &str) -> String {
     match path {
         "/0/private/BalanceEx" => r#"{"error":[],"result":{"ZUSD":{"balance":"10"}}}"#.into(),
         "/0/private/TradesHistory" | "/0/private/Ledgers" => OK_EMPTY.into(),
-        "/0/private/AddOrder" | "/0/private/WithdrawStatus" => DENIED.into(),
+        "/0/private/AddOrder" | "/0/private/WithdrawMethods" => DENIED.into(),
+        // Kraken allows this one with "Query ledger entries", which a read-only key here has.
+        "/0/private/WithdrawStatus" => r#"{"error":[],"result":[]}"#.into(),
         "/0/public/Assets" => ASSETS.into(),
         "/0/public/AssetPairs" => PAIRS.into(),
         other => panic!("unexpected call to {other}"),
@@ -102,7 +104,7 @@ fn a_read_only_key_is_accepted_and_every_private_call_is_signed_over_the_body_it
 
     let seen = server.seen.lock().unwrap().clone();
     let private: Vec<&Seen> = seen.iter().filter(|s| s.path.starts_with("/0/private/")).collect();
-    assert_eq!(private.iter().map(|s| s.path.as_str()).collect::<Vec<_>>(), vec!["/0/private/BalanceEx", "/0/private/TradesHistory", "/0/private/Ledgers", "/0/private/AddOrder", "/0/private/WithdrawStatus"]);
+    assert_eq!(private.iter().map(|s| s.path.as_str()).collect::<Vec<_>>(), vec!["/0/private/BalanceEx", "/0/private/TradesHistory", "/0/private/Ledgers", "/0/private/AddOrder", "/0/private/WithdrawMethods"]);
     let signer = Credentials::new("my-key", SECRET).unwrap();
     for call in private {
         assert_eq!(call.api_key.as_deref(), Some("my-key"));
@@ -135,11 +137,45 @@ fn a_key_that_can_place_orders_is_refused_whether_or_not_the_check_order_was_val
 
 #[test]
 fn a_key_that_can_withdraw_is_refused() {
-    let server = stand_in(|path, body| if path == "/0/private/WithdrawStatus" { r#"{"error":[],"result":[]}"#.into() } else { read_only_key(path, body) });
+    let server = stand_in(|path, body| if path == "/0/private/WithdrawMethods" { r#"{"error":[],"result":[]}"#.into() } else { read_only_key(path, body) });
     match client(&server).ensure_read_only() {
         Err(KrakenError::NotReadOnly(what)) => assert!(what.contains("withdraw"), "{what}"),
         other => panic!("expected NotReadOnly, got {other:?}"),
     }
+}
+
+#[test]
+fn a_key_allowed_to_list_withdrawals_only_through_the_ledger_permission_is_not_mistaken_for_one_that_can_withdraw() {
+    // The very key this needs: it can read the ledger, so Kraken answers WithdrawStatus,
+    // yet it cannot withdraw. That call must not be what decides.
+    let server = stand_in(read_only_key);
+    client(&server).ensure_read_only().unwrap();
+    assert!(!server.seen.lock().unwrap().iter().any(|s| s.path == "/0/private/WithdrawStatus"));
+}
+
+#[test]
+fn when_kraken_no_longer_answers_the_methods_call_the_fee_lookup_decides_and_a_second_unclear_answer_refuses_the_key() {
+    let unavailable = r#"{"error":["EGeneral:Unknown method"]}"#;
+    // The fee lookup refuses the key: it cannot withdraw.
+    let server = stand_in(move |path, body| match path {
+        "/0/private/WithdrawMethods" => unavailable.into(),
+        "/0/private/WithdrawInfo" => DENIED.into(),
+        _ => read_only_key(path, body),
+    });
+    client(&server).ensure_read_only().unwrap();
+    // The fee lookup goes through (an unknown key is the call's own complaint): it can withdraw.
+    let server = stand_in(move |path, body| match path {
+        "/0/private/WithdrawMethods" => unavailable.into(),
+        "/0/private/WithdrawInfo" => r#"{"error":["EFunding:Unknown withdraw key"]}"#.into(),
+        _ => read_only_key(path, body),
+    });
+    assert!(matches!(client(&server).ensure_read_only(), Err(KrakenError::NotReadOnly(_))));
+    // Neither answers clearly: nothing can be concluded, so the key is not accepted.
+    let server = stand_in(move |path, body| match path {
+        "/0/private/WithdrawMethods" | "/0/private/WithdrawInfo" => unavailable.into(),
+        _ => read_only_key(path, body),
+    });
+    assert!(matches!(client(&server).ensure_read_only(), Err(KrakenError::Unverifiable(_))));
 }
 
 #[test]

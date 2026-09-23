@@ -304,8 +304,18 @@ impl KrakenClient {
             Probe::Allowed => return Err(KrakenError::NotReadOnly("it can place orders".into())),
             Probe::Unclear(said) => return Err(KrakenError::Unverifiable(said)),
         }
-        // Listing recent withdrawals needs the withdrawal permission, and only lists.
-        match self.probe("/0/private/WithdrawStatus", &[], "EFunding:")? {
+        // Listing the withdrawal methods needs both the query and the withdrawal permission
+        // and only lists. (`WithdrawStatus` will not do: Kraken also allows it with
+        // "Query ledger entries", which this key must have.) If Kraken no longer answers
+        // that call, the equally harmless fee lookup for a withdrawal is tried instead.
+        let verdict = match self.probe("/0/private/WithdrawMethods", &[], "EFunding:")? {
+            Probe::Unclear(_) => {
+                let quote = [("asset", "XBT".to_string()), ("key", "linvesther-check".to_string()), ("amount", "0.001".to_string())];
+                self.probe("/0/private/WithdrawInfo", &quote, "EFunding:")?
+            }
+            answered => answered,
+        };
+        match verdict {
             Probe::Denied => Ok(()),
             Probe::Allowed => Err(KrakenError::NotReadOnly("it can withdraw funds".into())),
             Probe::Unclear(said) => Err(KrakenError::Unverifiable(said)),
