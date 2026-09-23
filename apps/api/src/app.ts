@@ -53,6 +53,7 @@ import { PublicProfileService } from "./profile/publicProfile.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { MemorySettingsStore, type SettingsStore } from "./profile/store.js";
 import { registerBinanceConnectRoutes } from "./binance-connect/routes.js";
+import type { WalletProofOptions } from "./binance-connect/walletProof.js";
 
 export interface AppOptions {
   domain: string;
@@ -100,6 +101,8 @@ export interface AppOptions {
   binanceWorkerBinaryPath?: string;
   /** Each account's choices about its public profile (in memory unless given a durable store). */
   profileSettingsStore?: SettingsStore;
+  /** Proof of ownership for on-chain wallets; without it wallets cannot be connected. */
+  walletProof?: Omit<WalletProofOptions, "now">;
   now?: () => Date;
 }
 
@@ -227,6 +230,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     workerBinaryPath: binanceWorkerBinaryPath,
     proofRateLimiter,
     now,
+    walletProof: options.walletProof && { ...options.walletProof, now },
     onAccountRemoved: (owner, accountId) =>
       publicProfiles.forgetAccount(owner, accountId),
   });
