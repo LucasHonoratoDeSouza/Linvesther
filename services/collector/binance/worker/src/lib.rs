@@ -10,6 +10,7 @@ pub mod crypto;
 pub mod db;
 pub mod history;
 pub mod ibkr;
+pub mod kraken;
 pub mod market;
 pub mod pnl;
 #[cfg(feature = "proving")]

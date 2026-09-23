@@ -16,6 +16,14 @@ function CoinbaseMark({ width = 20 }: { width?: number }) {
   );
 }
 
+function KrakenMark({ width = 20 }: { width?: number }) {
+  return (
+    <svg width={width} height={width} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Kraken">
+      <path d="M7 3v18M18 3L10 12l8 9" />
+    </svg>
+  );
+}
+
 function IbkrMark({ width = 20 }: { width?: number }) {
   return (
     <svg width={width} height={width} viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="Interactive Brokers">
@@ -35,5 +43,6 @@ export interface ExchangeEntry {
 export const EXCHANGES: ExchangeEntry[] = [
   { name: "Binance", status: "connected", mark: <BinanceMark /> },
   { name: "Coinbase", status: "connected", mark: <CoinbaseMark /> },
+  { name: "Kraken", status: "connected", mark: <KrakenMark /> },
   { name: "Interactive Brokers", status: "connected", mark: <IbkrMark /> },
 ];

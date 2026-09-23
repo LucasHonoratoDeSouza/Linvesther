@@ -17,6 +17,7 @@ const APPLIED: &[(&str, &str)] = &[
     ("0002_connection_label.sql", "13ba5fbdcc6c60cbc48c12fc44b786d959ddc66c75905a08bdef9088462b690a46ec6bbe3486949d2307156cebb2f706"),
     ("0003_coinbase.sql", "99a9c8bd3587205bd5c07e1f37976dc18603671ade56f9d846c132efe23288e241be72d5cbd33e5e3d47baf6d144a593"),
     ("0004_ibkr.sql", "ea455adffa36ce50b290d0a3517155017810eab0130f0c9e980bb455e16ac80617fe906e4bac38f2ce1b3ae72a6802dd"),
+    ("0005_kraken.sql", "1a234ca1d44e11acba14780dbf53c11dae25ba941a82d06d4baf7ce63d6386b7fa19e95d19daf3200ee5e026f2d1602a"),
 ];
 
 #[test]

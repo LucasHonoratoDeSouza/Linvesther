@@ -34,6 +34,7 @@ rust_decimal = "1"
 exchange-core = { path = "../../exchange-core" }
 coinbase-client = { path = "../../coinbase/client" }
 ibkr-client = { path = "../../ibkr/client" }
+kraken-client = { path = "../../kraken/client" }
 collector-attestation = { path = "../../attestation", optional = true }
 commitments = { path = "../../../../crates/commitments", optional = true }
 zkvm-methods = { path = "../../../../zkvm/methods/performance", optional = true }

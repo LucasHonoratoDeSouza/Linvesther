@@ -189,6 +189,14 @@ export function connectCoinbase(accountId: string, keyName: string, privateKey: 
   });
 }
 
+export function connectKraken(accountId: string, apiKey: string, apiSecret: string, label?: string): Promise<ApiResult<BinanceConnectResult>> {
+  return call(`/accounts/${accountId}/kraken-connection`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ apiKey, apiSecret, label }),
+  });
+}
+
 export function renameAccount(accountId: string, label: string): Promise<ApiResult<{ label: string }>> {
   return call(`/accounts/${accountId}/label`, {
     method: "PATCH",

@@ -48,6 +48,7 @@ test("portfolio: signing in offers to connect a first account, and the popup lis
   await expect(modal.getByTestId("broker-option-binance")).toBeVisible();
   // Every broker that can be connected is listed, crypto and stocks alike.
   await expect(modal.getByTestId("broker-option-coinbase")).toBeVisible();
+  await expect(modal.getByTestId("broker-option-kraken")).toBeVisible();
   await expect(modal.getByTestId("broker-option-ibkr")).toBeVisible();
 
   await modal.getByTestId("broker-option-binance").click();

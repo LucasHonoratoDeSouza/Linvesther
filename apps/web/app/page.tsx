@@ -47,12 +47,12 @@ const questions = [
   {
     question: "Does Linvesther have access to my funds?",
     answer:
-      "No. Every connection is read-only: Binance and Coinbase keys with trading or withdrawal permissions are rejected, and Interactive Brokers works from a read-only report token. Your assets stay at the exchange. Your passkey or password identity is what signs on your behalf.",
+      "No. Every connection is read-only: Binance, Coinbase and Kraken keys with trading or withdrawal permissions are rejected, and Interactive Brokers works from a read-only report token. Your assets stay at the exchange. Your passkey or password identity is what signs on your behalf.",
   },
   {
     question: "Which accounts can I connect?",
     answer:
-      "Binance, Coinbase and Interactive Brokers, in any combination. Crypto exchanges update within moments; Interactive Brokers reports once a day. We're always improving, and many more connections are on the way, so this list won't stay short.",
+      "Binance, Coinbase, Kraken and Interactive Brokers, in any combination. Crypto exchanges update within moments; Interactive Brokers reports once a day. We're always improving, and many more connections are on the way, so this list won't stay short.",
   },
   {
     question: "Is anything stored on a blockchain?",

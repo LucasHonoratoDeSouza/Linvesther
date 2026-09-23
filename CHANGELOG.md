@@ -43,6 +43,13 @@ All notable changes are recorded here. The format follows
 
 ### Added
 
+- Kraken (spot) as a fourth read-only connection: a signed client for balances,
+  trades, the account ledger and prices, with deposits and withdrawals read from
+  the ledger instead of inferred. A key that can place orders or withdraw is
+  refused, checked by trying without changing anything since Kraken cannot
+  report a key's permissions. Verified against the request-signing example in
+  Kraken's guide and a stand-in server; not yet against a real account.
+
 - Four guides in the documentation (verifiable track records, zero-knowledge
   performance, proving performance without revealing trades, and a comparison of
   verification approaches), each with `TechArticle` structured data.

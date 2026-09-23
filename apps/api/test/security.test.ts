@@ -227,6 +227,7 @@ describe("credentials sent to connect an account", () => {
     }
     expect((await connect("coinbase-connection", { keyName: "n", privateKey: "x".repeat(5000) })).statusCode).toBe(400);
     expect((await connect("ibkr-connection", { token: "t", queryId: ["1"] })).statusCode).toBe(400);
+    expect((await connect("kraken-connection", { apiKey: "k", apiSecret: "x".repeat(5000) })).statusCode).toBe(400);
   });
 
   it("are refused, not crashed on, when there is no body at all", async () => {

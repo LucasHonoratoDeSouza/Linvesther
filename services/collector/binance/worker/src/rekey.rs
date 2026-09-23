@@ -23,7 +23,7 @@ struct Table {
     fields: [Field; 2],
 }
 
-const TABLES: [Table; 3] = [
+const TABLES: [Table; 4] = [
     Table {
         broker: "binance",
         table: "binance_connections",
@@ -46,6 +46,14 @@ const TABLES: [Table; 3] = [
         fields: [
             Field { ciphertext: "encrypted_token", nonce: "nonce_token", name: "token" },
             Field { ciphertext: "encrypted_query_id", nonce: "nonce_query_id", name: "query_id" },
+        ],
+    },
+    Table {
+        broker: "kraken",
+        table: "kraken_connections",
+        fields: [
+            Field { ciphertext: "encrypted_api_key", nonce: "nonce_api_key", name: "api_key" },
+            Field { ciphertext: "encrypted_api_secret", nonce: "nonce_api_secret", name: "api_secret" },
         ],
     },
 ];

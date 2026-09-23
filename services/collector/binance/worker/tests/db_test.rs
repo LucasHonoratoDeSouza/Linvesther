@@ -399,3 +399,132 @@ async fn rekey_moves_credentials_to_the_new_key_and_leaves_unreadable_ones_alone
     cleanup(&pool, readable).await;
     cleanup(&pool, foreign).await;
 }
+
+#[tokio::test]
+#[ignore = "requires a running local Postgres; see this file's doc comment."]
+async fn a_kraken_connection_stores_its_credential_encrypted_and_everything_collected_goes_with_it() {
+    use binance_flows::FlowFamily;
+    use binance_worker::crypto::credential_context;
+    use binance_worker::kraken;
+    use kraken_client::{LedgerEntry, Trade as KrakenTrade};
+
+    let pool = pool().await;
+    let account_id = "db-test-kraken";
+    sqlx::query("DELETE FROM kraken_connections WHERE account_id = $1").bind(account_id).execute(&pool).await.unwrap();
+
+    let key = test_key();
+    // The secret must be base64, like a real Kraken secret.
+    let secret = "kQH5HW/8p1uGOVjbgWA7FunAmGO8lsSUXNsu3eow76sz84Q18fWxnyRzBHCd3pd5nE9qa99HAZtuZuj6F1huXg==";
+    let stored_key = encrypt(&key, "kraken-public-key", &credential_context("kraken", account_id, "api_key")).unwrap();
+    let stored_secret = encrypt(&key, secret, &credential_context("kraken", account_id, "api_secret")).unwrap();
+    let id = kraken::insert_connection(&pool, account_id, &stored_key, &stored_secret).await.unwrap();
+
+    let connection = kraken::find_by_account(&pool, account_id).await.unwrap().unwrap();
+    assert!(kraken::credentials(&key, &connection).is_ok(), "the stored credential decrypts under its own account");
+    let moved = kraken::KrakenConnection { account_id: "someone-else".to_string(), ..connection };
+    assert!(kraken::credentials(&key, &moved).is_err(), "it does not decrypt under another account");
+
+    let trade = KrakenTrade {
+        id: "TX1".into(), order_id: "O1".into(), symbol: "BTC-USD".into(), base: "BTC".into(), quote: "USD".into(),
+        is_buy: true, price: "50000".into(), volume: "0.01".into(), fee: "0.8".into(), time_ms: 5_000,
+    };
+    kraken::insert_trades(&pool, id, std::slice::from_ref(&trade)).await.unwrap();
+    kraken::insert_trades(&pool, id, &[trade]).await.unwrap();
+    assert_eq!(kraken::stored_trade_count(&pool, id).await.unwrap(), 1, "the same trade twice is one trade");
+    let trades = kraken::trades(&pool, id).await.unwrap();
+    assert_eq!((trades[0].symbol.as_str(), trades[0].qty.as_str(), trades[0].commission_asset.as_str(), trades[0].is_buyer), ("BTC-USD", "0.01", "USD", true));
+
+    let line = |id: &str, kind: &str, asset: &str, amount: &str, time_ms: u64| LedgerEntry {
+        id: id.into(), refid: format!("R-{id}"), time_ms, kind: kind.into(), subtype: String::new(), asset: asset.into(), amount: amount.into(), fee: "0".into(),
+    };
+    let ledger = [line("L1", "deposit", "USD", "1000", 1_000), line("L2", "trade", "BTC", "0.01", 5_000), line("L3", "withdrawal", "USD", "-200", 9_000)];
+    kraken::insert_ledger(&pool, id, &ledger).await.unwrap();
+    kraken::insert_ledger(&pool, id, &ledger).await.unwrap();
+    let flows = kraken::flows(&pool, id).await.unwrap();
+    assert_eq!(flows.iter().map(|f| f.source_namespace).collect::<Vec<_>>(), vec![FlowFamily::Deposit, FlowFamily::Withdrawal], "the trade line is left to the trade history");
+
+    assert!(kraken::delete_connection(&pool, id).await.unwrap());
+    assert!(kraken::find_by_account(&pool, account_id).await.unwrap().is_none());
+    for table in ["kraken_trades", "kraken_ledger"] {
+        let left: (i64,) = sqlx::query_as(&format!("SELECT count(*) FROM {table} WHERE connection_id = $1")).bind(id).fetch_one(&pool).await.unwrap();
+        assert_eq!(left.0, 0, "{table} goes with the connection");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires a running local Postgres; see this file's doc comment."]
+async fn rekey_also_covers_kraken_credentials() {
+    use binance_worker::crypto::{credential_context, decrypt};
+    use binance_worker::{kraken, rekey};
+
+    let pool = pool().await;
+    let account_id = "db-test-kraken-rekey";
+    sqlx::query("DELETE FROM kraken_connections WHERE account_id = $1").bind(account_id).execute(&pool).await.unwrap();
+
+    let old = MasterKey::from_hex(&"11".repeat(32)).unwrap();
+    let ring = MasterKey::from_hex(&"22".repeat(32)).unwrap().with_previous(&"11".repeat(32)).unwrap();
+    let context = |field: &str| credential_context("kraken", account_id, field);
+    let stored_key = encrypt(&old, "the-key", &context("api_key")).unwrap();
+    let stored_secret = encrypt(&old, "the-secret", &context("api_secret")).unwrap();
+    kraken::insert_connection(&pool, account_id, &stored_key, &stored_secret).await.unwrap();
+
+    rekey::rekey(&pool, &ring).await.unwrap();
+
+    let moved = kraken::find_by_account(&pool, account_id).await.unwrap().unwrap();
+    let new_only = MasterKey::from_hex(&"22".repeat(32)).unwrap();
+    let nonce: [u8; 12] = moved.nonce_api_secret.clone().try_into().unwrap();
+    assert_eq!(decrypt(&new_only, &moved.encrypted_api_secret, &nonce, &context("api_secret")).unwrap(), "the-secret");
+    sqlx::query("DELETE FROM kraken_connections WHERE account_id = $1").bind(account_id).execute(&pool).await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires a running local Postgres; see this file's doc comment."]
+async fn kraken_is_not_called_again_when_the_last_sync_or_check_was_recent_and_never_by_two_syncs_at_once() {
+    use binance_worker::crypto::credential_context;
+    use binance_worker::kraken;
+    use kraken_client::{Credentials, KrakenClient};
+    use std::sync::Arc;
+
+    let pool = pool().await;
+    let account_id = "db-test-kraken-gating";
+    sqlx::query("DELETE FROM kraken_connections WHERE account_id = $1").bind(account_id).execute(&pool).await.unwrap();
+    let key = test_key();
+    let secret = "kQH5HW/8p1uGOVjbgWA7FunAmGO8lsSUXNsu3eow76sz84Q18fWxnyRzBHCd3pd5nE9qa99HAZtuZuj6F1huXg==";
+    let stored_key = encrypt(&key, "k", &credential_context("kraken", account_id, "api_key")).unwrap();
+    let stored_secret = encrypt(&key, secret, &credential_context("kraken", account_id, "api_secret")).unwrap();
+    let id = kraken::insert_connection(&pool, account_id, &stored_key, &stored_secret).await.unwrap();
+    let connection = kraken::find_by_account(&pool, account_id).await.unwrap().unwrap();
+    // Nothing listens here, so any call to Kraken fails: success means no call was made.
+    // A blocking HTTP client has to be built where blocking is allowed, as the worker does.
+    let secret_owned = secret.to_string();
+    let unreachable = || {
+        let secret = secret_owned.clone();
+        async move {
+            tokio::task::spawn_blocking(move || Arc::new(KrakenClient::with_base_url(Credentials::new("k", &secret).unwrap(), "http://127.0.0.1:9")))
+                .await
+                .unwrap()
+        }
+    };
+
+    // A key never checked is checked; one checked a moment ago is not checked again.
+    assert!(kraken::verify_if_due(&pool, id, unreachable().await).await.is_err(), "it tried to reach Kraken");
+    kraken::mark_verified(&pool, id).await.unwrap();
+    assert!(kraken::verify_if_due(&pool, id, unreachable().await).await.is_ok(), "it trusted the recent check");
+
+    // A connection synced a moment ago is left alone unless a sync is asked for outright.
+    sqlx::query("UPDATE kraken_connections SET last_synced_at = now() WHERE id = $1").bind(id).execute(&pool).await.unwrap();
+    assert!(kraken::sync(&pool, &connection, unreachable().await, false).await.is_ok(), "a recent sync is reused");
+    assert!(kraken::sync(&pool, &connection, unreachable().await, true).await.is_err(), "a forced sync goes to Kraken");
+
+    // While another sync of the same connection holds its lock, a second does nothing.
+    let mut holder = pool.acquire().await.unwrap();
+    let lock_key = i64::from_le_bytes(id.as_bytes()[..8].try_into().unwrap());
+    let (held,): (bool,) = sqlx::query_as("SELECT pg_try_advisory_lock($1)").bind(lock_key).fetch_one(&mut *holder).await.unwrap();
+    assert!(held);
+    assert!(kraken::sync(&pool, &connection, unreachable().await, true).await.is_ok(), "a sync already under way is enough");
+    sqlx::query("SELECT pg_advisory_unlock($1)").bind(lock_key).execute(&mut *holder).await.unwrap();
+    drop(holder);
+    assert!(kraken::sync(&pool, &connection, unreachable().await, true).await.is_err(), "and once it is done the lock is free again");
+
+    sqlx::query("DELETE FROM kraken_connections WHERE account_id = $1").bind(account_id).execute(&pool).await.unwrap();
+}

@@ -398,7 +398,7 @@ pub async fn sync(pool: &PgPool, connection: &CoinbaseConnection, client: std::s
 
 /// A stable numeric id for a Coinbase identifier (the engine's `Trade` id
 /// is a number; Coinbase's are strings).
-fn stable_id(text: &str) -> u64 {
+pub fn stable_id(text: &str) -> u64 {
     text.bytes().fold(0xcbf29ce484222325u64, |hash, byte| (hash ^ byte as u64).wrapping_mul(0x100000001b3))
 }
 

@@ -52,6 +52,36 @@ export default function Connections() {
       </section>
 
       <section>
+        <h2>Kraken</h2>
+        <ol>
+          <li>
+            In Kraken, open Security, then API (or Settings, then API), and
+            create a new key.
+          </li>
+          <li>
+            Tick only the query permissions: <strong>Query funds</strong>,{" "}
+            <strong>Query open orders &amp; trades</strong>,{" "}
+            <strong>Query closed orders &amp; trades</strong> and{" "}
+            <strong>Query ledger entries</strong>. Leave order, deposit and
+            withdrawal permissions off.
+          </li>
+          <li>
+            Copy the API key and the private key. Kraken shows the private key
+            once.
+          </li>
+        </ol>
+        <p>
+          Spot accounts are supported. Kraken cannot tell an application what a
+          key may do, so Linvesther checks it by trying, without changing
+          anything: a key that Kraken allows to place an order or list
+          withdrawals is refused. Deposits and withdrawals are read from your
+          Kraken ledger, and staking rewards count as performance, not as money
+          you put in. Kraken keeps price history only for a limited time, so a
+          very old range may not be drawn at the finest detail.
+        </p>
+      </section>
+
+      <section>
         <h2>Interactive Brokers</h2>
         <ol>
           <li>

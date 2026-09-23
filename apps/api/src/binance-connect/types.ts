@@ -12,7 +12,7 @@ export interface BinanceConnectRequest {
 /** One exchange account connected under an identity. */
 export interface ConnectedAccount {
   accountId: string;
-  /** Which broker/exchange this account is at: `"binance"` or `"coinbase"`. */
+  /** Which broker/exchange this account is at: `"binance"`, `"coinbase"`, `"kraken"` or `"ibkr"`. */
   broker: string;
   label: string | null;
   /** Epoch ms of the connection — every figure for this account is measured from then. */
@@ -23,6 +23,12 @@ export interface ConnectedAccount {
 export interface CoinbaseConnectRequest {
   keyName: string;
   privateKey: string;
+  label?: string;
+}
+
+export interface KrakenConnectRequest {
+  apiKey: string;
+  apiSecret: string;
   label?: string;
 }
 
