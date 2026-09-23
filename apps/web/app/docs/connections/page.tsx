@@ -63,7 +63,7 @@ export default function Connections() {
             <strong>Query funds</strong> (under Funds),{" "}
             <strong>Query open orders &amp; trades</strong> and{" "}
             <strong>Query closed orders &amp; trades</strong> (under Orders and
-            trades), and <strong>Query ledger entries</strong> (under Other,
+            trades), and <strong>Query ledger entries</strong> (under Data,
             easy to miss). Leave order, deposit and withdrawal permissions off.
           </li>
           <li>
