@@ -152,7 +152,10 @@ fn an_answer_that_proves_nothing_about_the_key_is_not_taken_as_read_only() {
 fn a_key_missing_a_read_permission_is_told_which_one() {
     let server = stand_in(|path, body| if path == "/0/private/Ledgers" { DENIED.into() } else { read_only_key(path, body) });
     match client(&server).ensure_read_only() {
-        Err(KrakenError::MissingPermission(what)) => assert_eq!(what, "query ledger entries"),
+        Err(KrakenError::MissingPermission { permission, said }) => {
+            assert!(permission.contains("Query ledger entries") && permission.contains("Other"), "{permission}");
+            assert!(said.contains("Permission denied"), "Kraken's own words are kept: {said}");
+        }
         other => panic!("expected MissingPermission, got {other:?}"),
     }
     let server = stand_in(|_, _| r#"{"error":["EAPI:Invalid key"]}"#.into());

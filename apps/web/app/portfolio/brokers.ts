@@ -66,12 +66,11 @@ export const BROKERS: BrokerDefinition[] = [
     id: "kraken",
     name: "Kraken",
     logo: "/logos/kraken.svg",
-    roundedLogo: true,
     kind: "crypto",
     summary: "Spot account · read-only API key",
     instructions: [
       "In Kraken, open Security → API (or Settings → API) and create a new API key.",
-      "Tick only the query permissions: “Query funds”, “Query open orders & trades”, “Query closed orders & trades” and “Query ledger entries”.",
+      "Tick only these four, which sit in different groups: under Funds “Query funds”; under Orders and trades “Query open orders & trades” and “Query closed orders & trades”; and under Other “Query ledger entries”.",
       "Copy the API key and the private key (Kraken shows the private key once). Keys that can place orders or withdraw are rejected.",
     ],
     fields: [
