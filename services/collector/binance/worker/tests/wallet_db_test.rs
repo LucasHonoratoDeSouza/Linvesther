@@ -253,3 +253,68 @@ async fn rekey_also_covers_wallet_addresses() {
     assert_eq!(wallet::stored_address(&new_only, &moved).unwrap(), WALLET);
     cleanup(&pool, &account).await;
 }
+
+/// The chain's events happen at real moments after the connection, so the engine counts them.
+fn receive_at(hash: &str, block: u64, wei: u128, time_ms: u64) -> NormalTx {
+    NormalTx { time_ms, ..receive(hash, block, wei) }
+}
+
+#[tokio::test]
+#[ignore = "requires a running local Postgres; see db_test.rs for how to start one."]
+async fn a_wallets_return_counts_the_price_move_and_not_the_money_it_received() {
+    let pool = pool().await;
+    let account = format!("{OWNER}_wallet-return");
+    start_clean(&pool).await;
+    let chain = SyntheticChain::new(1000);
+    chain.open_with_native(ETH);
+    let prices = Arc::new(SyntheticPrices::new());
+    let connection = connect(&pool, &account, &chain, &prices).await;
+    let connected = wallet::created_at_ms(&pool, connection.id).await.unwrap();
+    let hour = 3_600_000u64;
+    // Ether is $2,000 until a day and a half after connecting, $2,200 after.
+    prices.set_schedule("coingecko:ethereum", &[(0, d("2000")), (connected + 36 * hour, d("2200"))]);
+
+    // A day after connecting, another ether arrives (at $2,000): money in, not a gain.
+    chain.push_normal(receive_at("0xdeposit", 1010, ETH, connected + 24 * hour));
+    chain.set_head(1100);
+    later(&pool, &connection, &chain, &prices, connected + 48 * hour).await.unwrap();
+
+    let market = wallet::market(&pool, connection.id, prices.clone()).await.unwrap();
+    let flows = wallet::flows(&pool, connection.id).await.unwrap();
+    let history = binance_worker::history::history_from(Vec::new(), flows, connected, market, connected + 72 * hour).await.unwrap();
+    let last = history.twr_index.last().unwrap().index;
+    // 2 ether at $2,200 against 1 at $2,000 plus 1 deposited at $2,000: +10%, not +120%.
+    assert!((last - d("1.10")).abs() < d("0.0005"), "the index ended at {last}");
+    cleanup(&pool, &account).await;
+}
+
+#[tokio::test]
+#[ignore = "requires a running local Postgres; see db_test.rs for how to start one."]
+async fn swapping_one_asset_for_another_at_fair_prices_leaves_the_return_where_it_was() {
+    let pool = pool().await;
+    let account = format!("{OWNER}_wallet-swap");
+    start_clean(&pool).await;
+    let chain = SyntheticChain::new(1000);
+    chain.open_with_token("0xusdc", "USDC", 6, 2_000_000_000);
+    let prices = Arc::new(SyntheticPrices::new());
+    prices.set("ethereum:0xusdc", d("1"));
+    let connection = connect(&pool, &account, &chain, &prices).await;
+    let connected = wallet::created_at_ms(&pool, connection.id).await.unwrap();
+    let hour = 3_600_000u64;
+    prices.set_schedule("coingecko:ethereum", &[(0, d("2000"))]);
+
+    // 2,000 USDC become 1 ether at $2,000, with the ether leg arriving as an internal transfer.
+    let swap_time = connected + 24 * hour;
+    chain.push_token(TokenTransfer { time_ms: swap_time, ..token_out("0xswap", 1010, "0xusdc", 2_000_000_000) });
+    chain.push_internal(InternalTx { hash: "0xswap".into(), block: 1010, time_ms: swap_time, from: OTHER.into(), to: WALLET.into(), value: ETH.to_string(), index: "1".into(), failed: false });
+    chain.set_head(1100);
+    later(&pool, &connection, &chain, &prices, connected + 48 * hour).await.unwrap();
+
+    let flows = wallet::flows(&pool, connection.id).await.unwrap();
+    assert_eq!(flows.iter().map(|f| f.source_namespace).collect::<Vec<_>>(), vec![FlowFamily::Convert]);
+    let market = wallet::market(&pool, connection.id, prices.clone()).await.unwrap();
+    let history = binance_worker::history::history_from(Vec::new(), flows, connected, market, connected + 72 * hour).await.unwrap();
+    let last = history.twr_index.last().unwrap().index;
+    assert!((last - d("1")).abs() < d("0.0005"), "a fair swap changes no value: the index ended at {last}");
+    cleanup(&pool, &account).await;
+}
