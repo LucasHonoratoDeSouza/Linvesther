@@ -1,6 +1,6 @@
 import { SERIES_RANGES, type BinancePerformance, type BinanceSeries, type ConnectedAccount, type SeriesRange } from "../binance-connect/types.js";
 import { invokeWorker } from "../binance-connect/worker.js";
-import { combineReturns, maxDrawdown, sharpe } from "./combine.js";
+import { atMostDaily, combineReturns, maxDrawdown, sharpe } from "./combine.js";
 import { buildStatement } from "./statement.js";
 import type { SettingsStore } from "./store.js";
 import type { CollectorOrigin, ProfileStatement, ShareableMetric } from "./types.js";
@@ -140,8 +140,10 @@ export class PublicProfileService {
     return this.options.settings.get(address).then((s) => s.privacyMode);
   }
 
-  private accountSeries(accountId: string, range: SeriesRange) {
-    return this.seriesCache.get(`${accountId.toLowerCase()}|${range}`, () => this.worker<BinanceSeries>("series", { accountId, range }));
+  /** What the public sees of an account's curve: a wallet's is coarsened to one point a day. */
+  private async accountSeries(account: Pick<ConnectedAccount, "accountId" | "broker">, range: SeriesRange) {
+    const series = await this.seriesCache.get(`${account.accountId.toLowerCase()}|${range}`, () => this.worker<BinanceSeries>("series", { accountId: account.accountId, range }));
+    return account.broker === "wallet" ? atMostDaily(series) : series;
   }
 
   /** The one track anyone can see at `address`: every public account added
@@ -164,7 +166,7 @@ export class PublicProfileService {
         this.performanceCache.get(account.accountId.toLowerCase(), () => this.worker<BinancePerformance>("performance", { accountId: account.accountId })),
       ),
     );
-    const curve = combineReturns(await Promise.all(accounts.map((account) => this.accountSeries(account.accountId, "max"))));
+    const curve = combineReturns(await Promise.all(accounts.map((account) => this.accountSeries(account, "max"))));
     const drawdown = maxDrawdown(curve);
     const ratio = sharpe(curve);
     const wins = performances.reduce((sum, p) => sum + (p.winRate?.wins ?? 0), 0);
@@ -198,7 +200,7 @@ export class PublicProfileService {
     const accounts = await this.accounts(address);
     if (accounts.length === 0) return null;
 
-    const all = await Promise.all(accounts.map((account) => this.accountSeries(account.accountId, range)));
+    const all = await Promise.all(accounts.map((account) => this.accountSeries(account, range)));
     const curve = combineReturns(all);
     return {
       points: curve.map((p) => ({ timeMs: p.timeMs, returnFraction: (p.growth - 1).toFixed(6) })),
