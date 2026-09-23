@@ -51,6 +51,10 @@ jobs:
           bash /tmp/rzup-install.sh
           echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
       - run: "$HOME/.risc0/bin/rzup install"
+        env:
+          # Without a token the toolchain download shares an anonymous rate limit
+          # with every other job on the runner and fails at random.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Reduced scale for CI turnaround; the real 10k-event/3-rep
       # measurement is a one-time benchmark recorded in
       # experiments/risc0-benchmark/report.md, not a per-commit CI cost.
@@ -164,6 +168,10 @@ jobs:
           bash /tmp/rzup-install.sh
           echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
       - run: "$HOME/.risc0/bin/rzup install"
+        env:
+          # Without a token the toolchain download shares an anonymous rate limit
+          # with every other job on the runner and fails at random.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: make check-zk
 
   audit:

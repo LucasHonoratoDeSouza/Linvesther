@@ -21,7 +21,7 @@ uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-thiserror = "1"
+thiserror = "2"
 aes-gcm = "0.11"
 getrandom = "0.2"
 hex = "0.4"
@@ -34,6 +34,7 @@ rust_decimal = "1"
 exchange-core = { path = "../../exchange-core" }
 coinbase-client = { path = "../../coinbase/client" }
 ibkr-client = { path = "../../ibkr/client" }
+kraken-client = { path = "../../kraken/client" }
 collector-attestation = { path = "../../attestation", optional = true }
 commitments = { path = "../../../../crates/commitments", optional = true }
 zkvm-methods = { path = "../../../../zkvm/methods/performance", optional = true }

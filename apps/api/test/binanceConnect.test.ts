@@ -114,6 +114,17 @@ describe("owning several connected accounts", () => {
     expect((await coinbase(`${ME}_coinbase`, { keyName: "only-a-name" })).statusCode).toBe(400);
   });
 
+  it("connects a Kraken account for me only, sending the key and secret to the worker for that exchange", async () => {
+    const { app, cookies } = await appWithSession();
+    const kraken = (accountId: string, payload: object = { apiKey: "kraken-key", apiSecret: "a3Jha2VuLXNlY3JldA==", label: "KR" }) =>
+      app.inject({ method: "POST", url: `/accounts/${accountId}/kraken-connection`, cookies, payload });
+    const mine = await kraken(`${ME}_kraken`);
+    expect(mine.statusCode).toBe(201);
+    expect(mine.json().echoed).toMatchObject({ exchange: "kraken", accountId: `${ME}_kraken`, apiKey: "kraken-key", apiSecret: "a3Jha2VuLXNlY3JldA==", label: "KR" });
+    expect((await kraken(`${SOMEONE_ELSE}_x`)).statusCode).toBe(403);
+    expect((await kraken(`${ME}_kraken`, { apiKey: "only-a-key" })).statusCode).toBe(400);
+  });
+
   it("lets me rename my own accounts only", async () => {
     const { app, cookies } = await appWithSession();
     const rename = (accountId: string, label: string) => app.inject({ method: "PATCH", url: `/accounts/${accountId}/label`, cookies, payload: { label } });

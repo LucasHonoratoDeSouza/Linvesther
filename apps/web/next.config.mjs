@@ -43,11 +43,27 @@ const nextConfig = {
   // The list of trusted collectors lives at the repository root (`trust/`),
   // shared with the command-line verifier.
   experimental: { externalDir: true },
+  images: {
+    // The default (60s) re-encodes the same image from scratch on almost
+    // every request once traffic is light, which is what made images look
+    // slow to load. Public images don't change without a new deploy, so a
+    // long cache is safe; the optimizer still adapts size/format per request.
+    minimumCacheTTL: 31536000,
+  },
   async rewrites() {
     return hostRewrites(process.env.ROOT_DOMAIN);
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The video and its poster are static files (unlike public/images/*,
+      // which the /_next/image optimizer already caches long — see above),
+      // so without this they were re-sent in full on every visit.
+      {
+        source: "/video/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
   },
 };
 

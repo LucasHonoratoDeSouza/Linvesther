@@ -6,4 +6,4 @@ publish = false
 
 [dependencies]
 rust_decimal = "1"
-thiserror = "1"
+thiserror = "2"

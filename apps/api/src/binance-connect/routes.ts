@@ -5,7 +5,7 @@ import { requireSession } from "../auth/requireSession.js";
 import type { SessionStore } from "../auth/sessionStore.js";
 import { invokeWorker, WorkerInvocationError } from "./worker.js";
 import { SERIES_RANGES, type SeriesRange } from "./types.js";
-import type { BinanceSeries, BinanceConnectionStatus, BinanceConnectRequest, CoinbaseConnectRequest, IbkrConnectRequest, ConnectedAccount, BinanceConnectResult, BinanceNav, BinancePerformance, BinancePerformanceProof } from "./types.js";
+import type { BinanceSeries, BinanceConnectionStatus, BinanceConnectRequest, CoinbaseConnectRequest, IbkrConnectRequest, KrakenConnectRequest, ConnectedAccount, BinanceConnectResult, BinanceNav, BinancePerformance, BinancePerformanceProof } from "./types.js";
 
 export interface BinanceConnectRouteOptions {
   sessionStore: SessionStore;
@@ -203,6 +203,37 @@ export function registerBinanceConnectRoutes(app: FastifyInstance, options: Bina
     } catch (error) {
       if (error instanceof WorkerInvocationError) {
         return reply.code(422).send({ error: "ibkr_connection_failed", detail: error.message });
+      }
+      throw error;
+    }
+  });
+
+  app.post<{ Params: { accountId: string }; Body: unknown }>("/accounts/:accountId/kraken-connection", async (request, reply) => {
+    const session = await requireSession(request, options.sessionStore);
+    if (!session) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+    if (!isOwner(options.accountOwners, request.params.accountId, session.address)) {
+      return reply.code(403).send({ error: "cross_account_access_denied" });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    // A Kraken key is 56 characters and its secret a 88-character base64 string.
+    const apiKey = boundedString(body.apiKey, 256);
+    const apiSecret = boundedString(body.apiSecret, 256);
+    const label = body.label === undefined ? undefined : boundedString(body.label, 40);
+    if (!apiKey || !apiSecret || (body.label !== undefined && !label)) {
+      return reply.code(400).send({ error: "apiKey and apiSecret are required" });
+    }
+    try {
+      const result = await invokeWorker<BinanceConnectResult>(
+        { binaryPath: options.workerBinaryPath },
+        "connect",
+        JSON.stringify({ exchange: "kraken", accountId: request.params.accountId, apiKey, apiSecret, label }),
+      );
+      return reply.code(201).send(result);
+    } catch (error) {
+      if (error instanceof WorkerInvocationError) {
+        return reply.code(422).send({ error: "kraken_connection_failed", detail: error.message });
       }
       throw error;
     }

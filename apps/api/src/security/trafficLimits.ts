@@ -9,7 +9,7 @@ interface Policy {
   windowMs: number;
 }
 
-const CONNECT = /^\/accounts\/[^/]+\/(binance|coinbase|ibkr)-connection$/;
+const CONNECT = /^\/accounts\/[^/]+\/(binance|coinbase|kraken|ibkr)-connection$/;
 // Routes that make the server broadcast a transaction and pay its gas.
 const RELAY =
   /^\/(identities|tracks)(\/|$)|^\/accounts\/[^/]+\/(activate|remove)(-challenge)?$|^\/profile\/identity/;

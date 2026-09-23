@@ -6,6 +6,18 @@ All notable changes are recorded here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- Images now stay cached for a year instead of 60 seconds after the site's
+  first request for each size, which is what made them look slow to load —
+  every image was already served resized and as WebP (or AVIF), but a stale
+  cache re-encoded the same file on almost every request once traffic was
+  light. The IBKR broker logo now goes through the same resizing and format
+  negotiation as every other image on the site; it used to bypass it.
+
+- `thiserror` upgraded from 1 to 2 across every Rust crate (none of them are on
+  the zkVM guest's dependency path, so no proof's image identifier changes).
+
 ### Fixed
 
 - Creating an identity failed with `internal_error` right after the API had been
@@ -30,6 +42,13 @@ All notable changes are recorded here. The format follows
   button is gone.
 
 ### Added
+
+- Kraken (spot) as a fourth read-only connection: a signed client for balances,
+  trades, the account ledger and prices, with deposits and withdrawals read from
+  the ledger instead of inferred. A key that can place orders or withdraw is
+  refused, checked by trying without changing anything since Kraken cannot
+  report a key's permissions. Verified against the request-signing example in
+  Kraken's guide and a stand-in server; not yet against a real account.
 
 - Four guides in the documentation (verifiable track records, zero-knowledge
   performance, proving performance without revealing trades, and a comparison of

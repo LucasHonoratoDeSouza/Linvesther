@@ -1,4 +1,4 @@
-import { connectBinance, connectCoinbase, connectIbkr, type ApiResult } from "../../lib/api";
+import { connectBinance, connectCoinbase, connectIbkr, connectKraken, type ApiResult } from "../../lib/api";
 
 /** The one list of places an account can be connected from. The "Add
  * account" popup, the connect form and every account row are all driven
@@ -61,6 +61,24 @@ export const BROKERS: BrokerDefinition[] = [
       { key: "private-key", label: "Secret (or private key)", secret: true, multiline: true },
     ],
     connect: (accountId, values, label) => connectCoinbase(accountId, values["key-name"] ?? "", values["private-key"] ?? "", label),
+  },
+  {
+    id: "kraken",
+    name: "Kraken",
+    logo: "/logos/kraken.svg",
+    roundedLogo: true,
+    kind: "crypto",
+    summary: "Spot account · read-only API key",
+    instructions: [
+      "In Kraken, open Security → API (or Settings → API) and create a new API key.",
+      "Tick only the query permissions: “Query funds”, “Query open orders & trades”, “Query closed orders & trades” and “Query ledger entries”.",
+      "Copy the API key and the private key (Kraken shows the private key once). Keys that can place orders or withdraw are rejected.",
+    ],
+    fields: [
+      { key: "api-key", label: "API key", secret: true },
+      { key: "api-secret", label: "Private key", secret: true },
+    ],
+    connect: (accountId, values, label) => connectKraken(accountId, values["api-key"] ?? "", values["api-secret"] ?? "", label),
   },
   {
     id: "ibkr",

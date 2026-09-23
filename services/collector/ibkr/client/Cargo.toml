@@ -9,7 +9,7 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 quick-xml = { version = "0.41", features = ["serialize"] }
 serde = { version = "1", features = ["derive"] }
 rust_decimal = "1"
-thiserror = "1"
+thiserror = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
