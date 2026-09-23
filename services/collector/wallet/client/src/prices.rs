@@ -35,6 +35,13 @@ pub struct Price {
     pub at_ms: u64,
 }
 
+/// What the wallet needs from a price source; [`PriceSource`] is the real one.
+pub trait PriceProvider: Send + Sync {
+    fn current(&self, coins: &[String]) -> Result<BTreeMap<String, Price>, PriceError>;
+    fn at(&self, coins: &[String], at_ms: u64) -> Result<BTreeMap<String, Price>, PriceError>;
+    fn chart(&self, coin: &str, start_ms: u64, end_ms: u64, interval_ms: u64) -> Result<Vec<(u64, Decimal)>, PriceError>;
+}
+
 pub struct PriceSource {
     base_url: String,
     http: reqwest::blocking::Client,
@@ -165,6 +172,18 @@ impl PriceSource {
             from += span * step_ms;
         }
         Ok(points.into_iter().collect())
+    }
+}
+
+impl PriceProvider for PriceSource {
+    fn current(&self, coins: &[String]) -> Result<BTreeMap<String, Price>, PriceError> {
+        PriceSource::current(self, coins)
+    }
+    fn at(&self, coins: &[String], at_ms: u64) -> Result<BTreeMap<String, Price>, PriceError> {
+        PriceSource::at(self, coins, at_ms)
+    }
+    fn chart(&self, coin: &str, start_ms: u64, end_ms: u64, interval_ms: u64) -> Result<Vec<(u64, Decimal)>, PriceError> {
+        PriceSource::chart(self, coin, start_ms, end_ms, interval_ms)
     }
 }
 

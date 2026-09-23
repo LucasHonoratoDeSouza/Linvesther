@@ -87,14 +87,14 @@ fn a_rate_limit_answer_is_waited_out_and_retried_but_not_forever() {
         if *n <= 2 {
             (429, json!({ "message": "Too many requests", "result": null, "status": "0" }).to_string())
         } else {
-            (200, json!({ "status": "1", "message": "OK", "result": "42" }).to_string())
+            (200, json!({ "jsonrpc": "2.0", "id": 1, "result": "0x2a" }).to_string())
         }
     });
-    assert_eq!(explorer(&server, 10, 5).native_balance("0xaddr").unwrap(), "42");
+    assert_eq!(explorer(&server, 10, 5).head_block().unwrap(), 42);
     assert_eq!(*calls.lock().unwrap(), 3);
 
     let always = stand_in(|_| (429, "slow down".into()));
-    assert!(matches!(explorer(&always, 10, 5).native_balance("0xaddr"), Err(ExplorerError::Answer(_))));
+    assert!(matches!(explorer(&always, 10, 5).head_block(), Err(ExplorerError::Answer(_))));
     assert_eq!(always.seen.lock().unwrap().len(), 4, "the first try and three retries");
 }
 
@@ -103,15 +103,30 @@ fn each_explorer_is_asked_in_its_own_way() {
     let server = stand_in(|query| match param(query, "action").as_deref() {
         Some("eth_block_number") => (200, json!({ "jsonrpc": "2.0", "id": 1, "result": "0x10" }).to_string()),
         Some("tokenlist") => (200, json!({ "status": "1", "message": "OK", "result": [{ "balance": "5", "contractAddress": "0xTok", "decimals": "6", "name": "T", "symbol": "TOK", "type": "ERC-20" }] }).to_string()),
-        Some("balance") => (200, json!({ "status": "1", "message": "OK", "result": "7" }).to_string()),
         other => panic!("unexpected {other:?}"),
     });
     let blockscout = Explorer::new(Endpoint::Blockscout { base_url: server.url.clone(), api_key: Some("KEY".into()) }).with_limits(10, 5, Duration::ZERO, Duration::ZERO);
     assert_eq!(blockscout.head_block().unwrap(), 16);
     let tokens = blockscout.tokens("0xAddr").unwrap();
-    assert_eq!((tokens[0].contract.as_str(), tokens[0].balance.as_str()), ("0xtok", "5"), "holdings come with their balances");
-    assert_eq!(blockscout.native_balance("0xAddr").unwrap(), "7");
+    assert_eq!((tokens[0].contract.as_str(), tokens[0].symbol.as_str()), ("0xtok", "TOK"));
     let queries = server.seen.lock().unwrap().clone();
     assert!(queries.iter().all(|q| param(q, "apikey").as_deref() == Some("KEY")), "the key rides on every call: {queries:?}");
     assert!(queries.iter().any(|q| param(q, "module").as_deref() == Some("block")), "Blockscout's block number call: {queries:?}");
+}
+
+#[test]
+fn transfers_of_one_token_written_in_different_case_are_one_token() {
+    let server = stand_in(|query| match param(query, "action").as_deref() {
+        Some("eth_blockNumber") => (200, json!({ "jsonrpc": "2.0", "id": 1, "result": "0x64" }).to_string()),
+        Some("tokentx") => (200, json!({ "status": "1", "message": "OK", "result": [
+            { "blockNumber": "5", "timeStamp": "1700000005", "hash": "0x1", "contractAddress": "0xAAA", "from": "0xb", "to": "0xa", "tokenDecimal": "6", "tokenSymbol": "AAA", "value": "10" },
+            { "blockNumber": "6", "timeStamp": "1700000006", "hash": "0x2", "contractAddress": "0xaaa", "from": "0xa", "to": "0xb", "tokenDecimal": "6", "tokenSymbol": "AAA", "value": "10" },
+            { "blockNumber": "7", "timeStamp": "1700000007", "hash": "0x3", "contractAddress": "0xBBB", "from": "0xb", "to": "0xa", "tokenDecimal": "18", "tokenSymbol": "BBB", "value": "1" }
+        ] }).to_string()),
+        other => panic!("unexpected {other:?}"),
+    });
+    let explorer = Explorer::new(Endpoint::Blockscout { base_url: server.url.clone(), api_key: None }).with_limits(100, 50, Duration::ZERO, Duration::ZERO);
+    let transfers = explorer.token_transfers("0xa", 0, 100).unwrap();
+    let contracts: std::collections::BTreeSet<_> = transfers.rows.iter().map(|t| t.contract.clone()).collect();
+    assert_eq!(contracts.into_iter().collect::<Vec<_>>(), vec!["0xaaa", "0xbbb"], "the same token in different case is one token");
 }

@@ -28,6 +28,12 @@ pub struct Listing<T> {
     pub incomplete: bool,
 }
 
+impl<T> Default for Listing<T> {
+    fn default() -> Self {
+        Listing { rows: Vec::new(), incomplete: false }
+    }
+}
+
 /// A transaction the address sent or received (ether moved directly, and the gas paid).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormalTx {

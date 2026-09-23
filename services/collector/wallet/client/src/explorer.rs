@@ -128,21 +128,9 @@ impl Explorer {
         Ok(wire::parse_block_number(&body)?)
     }
 
-    /// The native balance now, in wei.
-    pub fn native_balance(&self, address: &str) -> Result<String, ExplorerError> {
-        let body = self.call("account", "balance", &[("address", address.to_string()), ("tag", "latest".into())])?;
-        Ok(wire::parse_integer_result(&body)?)
-    }
-
-    /// One token's balance now, in its smallest unit.
-    pub fn token_balance(&self, address: &str, contract: &str) -> Result<String, ExplorerError> {
-        let body = self.call("account", "tokenbalance", &[("address", address.to_string()), ("contractaddress", contract.to_string()), ("tag", "latest".into())])?;
-        Ok(wire::parse_integer_result(&body)?)
-    }
-
-    /// Every token the address holds or has held. Blockscout lists current holdings with their
-    /// balances; Etherscan has no such call, so the tokens the address ever received are found
-    /// from its transfers and their balances are asked for separately.
+    /// The tokens the address may hold: Blockscout lists its current holdings; Etherscan has no
+    /// such call, so the tokens it ever received are found from its transfers. Balances are read
+    /// separately, as of a block, from a node.
     pub fn tokens(&self, address: &str) -> Result<Vec<HeldToken>, ExplorerError> {
         match self.endpoint {
             Endpoint::Blockscout { .. } => {
