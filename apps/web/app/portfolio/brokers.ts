@@ -65,7 +65,7 @@ export const BROKERS: BrokerDefinition[] = [
   {
     id: "kraken",
     name: "Kraken",
-    logo: "/logos/kraken.svg",
+    logo: "/logos/kraken-mark.svg",
     kind: "crypto",
     summary: "Spot account · read-only API key",
     instructions: [
