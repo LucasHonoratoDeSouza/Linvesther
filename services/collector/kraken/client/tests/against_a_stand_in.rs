@@ -73,7 +73,7 @@ fn stand_in(handler: impl Fn(&str, &str) -> String + Send + Sync + 'static) -> S
 }
 
 fn client(server: &StandIn) -> KrakenClient {
-    KrakenClient::with_base_url(Credentials::new("my-key", SECRET).unwrap(), server.url.clone())
+    KrakenClient::with_base_url(Credentials::new("my-key", SECRET).unwrap(), server.url.clone()).with_waits(std::time::Duration::from_millis(5), std::time::Duration::from_millis(2))
 }
 
 const ASSETS: &str = r#"{"error":[],"result":{"XXBT":{"altname":"XBT"},"XETH":{"altname":"ETH"},"ZUSD":{"altname":"USD"},"XXDG":{"altname":"XDG"},"DOT":{"altname":"DOT"},"DOT.S":{"altname":"DOT.S"},"USDT":{"altname":"USDT"}}}"#;
@@ -278,4 +278,50 @@ fn a_trades_market_name_is_the_one_the_engine_looks_its_assets_up_by_and_prices_
     // The market that prices a holding of that asset is the same market.
     assert_eq!(client.market_symbol(&trade.base), trade.symbol);
     assert_eq!(client.quote_currency(), trade.quote);
+}
+
+#[test]
+fn a_call_refused_for_its_nonce_is_retried_with_a_newer_one_until_kraken_accepts_it() {
+    let calls = Arc::new(Mutex::new(0));
+    let counter = calls.clone();
+    let server = stand_in(move |path, body| {
+        if path == "/0/private/BalanceEx" {
+            let mut n = counter.lock().unwrap();
+            *n += 1;
+            if *n <= 3 {
+                return r#"{"error":["EAPI:Invalid nonce"]}"#.into();
+            }
+        }
+        read_only_key(path, body)
+    });
+    assert!(client(&server).fetch_account_balances().is_ok());
+    assert_eq!(*calls.lock().unwrap(), 4);
+    let nonces: Vec<u64> = server.seen.lock().unwrap().iter().filter(|s| s.path == "/0/private/BalanceEx").map(|s| s.body.strip_prefix("nonce=").unwrap().split('&').next().unwrap().parse().unwrap()).collect();
+    assert!(nonces.windows(2).all(|w| w[0] < w[1]), "each retry uses a newer nonce: {nonces:?}");
+}
+
+#[test]
+fn a_key_is_not_called_unverifiable_because_of_a_transient_nonce_refusal() {
+    // The refusal that once turned a good key away: the withdrawal check was refused for its nonce twice.
+    let refusals = Arc::new(Mutex::new(0));
+    let counter = refusals.clone();
+    let server = stand_in(move |path, body| {
+        if path == "/0/private/WithdrawMethods" {
+            let mut n = counter.lock().unwrap();
+            *n += 1;
+            if *n <= 2 {
+                return r#"{"error":["EAPI:Invalid nonce"]}"#.into();
+            }
+        }
+        read_only_key(path, body)
+    });
+    client(&server).ensure_read_only().unwrap();
+}
+
+#[test]
+fn a_nonce_refused_every_time_is_reported_as_what_it_is_after_a_bounded_number_of_tries() {
+    let server = stand_in(|_, _| r#"{"error":["EAPI:Invalid nonce"]}"#.into());
+    let result = client(&server).fetch_account_balances();
+    assert!(result.is_err());
+    assert_eq!(server.seen.lock().unwrap().iter().filter(|s| s.path == "/0/private/BalanceEx").count(), 9, "the first try and eight retries");
 }

@@ -192,6 +192,11 @@ fn lock_key(connection_id: Uuid) -> i64 {
     i64::from_le_bytes(connection_id.as_bytes()[..8].try_into().expect("a UUID has 16 bytes"))
 }
 
+/// The lock that lets one request at a time check the key's permissions.
+fn verify_lock_key(connection_id: Uuid) -> i64 {
+    lock_key(connection_id) ^ 0x5eed_c0de
+}
+
 /// Records that the key was just confirmed unable to place orders or withdraw.
 pub async fn mark_verified(pool: &PgPool, connection_id: Uuid) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE kraken_connections SET verified_read_only_at = now() WHERE id = $1").bind(connection_id).execute(pool).await?;
@@ -199,7 +204,9 @@ pub async fn mark_verified(pool: &PgPool, connection_id: Uuid) -> Result<(), sql
 }
 
 /// Confirms again that the key cannot place orders or withdraw, if it has been a
-/// while: a key's permissions can be widened at Kraken after it was connected.
+/// while: a key's permissions can be widened at Kraken after it was connected. Several
+/// requests often arrive together; one checks and the others rely on it, so the key is not
+/// tried a dozen times at once.
 pub async fn verify_if_due(pool: &PgPool, connection_id: Uuid, client: std::sync::Arc<KrakenClient>) -> Result<(), String> {
     let (recent,): (bool,) = sqlx::query_as("SELECT coalesce(verified_read_only_at > now() - make_interval(secs => $2), false) FROM kraken_connections WHERE id = $1")
         .bind(connection_id)
@@ -210,8 +217,15 @@ pub async fn verify_if_due(pool: &PgPool, connection_id: Uuid, client: std::sync
     if recent {
         return Ok(());
     }
-    tokio::task::spawn_blocking(move || client.ensure_cannot_write().map_err(|e| e.to_string())).await.map_err(|e| e.to_string())??;
-    mark_verified(pool, connection_id).await.map_err(|e| e.to_string())
+    let mut guard = pool.acquire().await.map_err(|e| e.to_string())?;
+    let (acquired,): (bool,) = sqlx::query_as("SELECT pg_try_advisory_lock($1)").bind(verify_lock_key(connection_id)).fetch_one(&mut *guard).await.map_err(|e| e.to_string())?;
+    if !acquired {
+        return Ok(());
+    }
+    let result = tokio::task::spawn_blocking(move || client.ensure_cannot_write().map_err(|e| e.to_string())).await.map_err(|e| e.to_string()).and_then(|r| r);
+    let recorded = if result.is_ok() { mark_verified(pool, connection_id).await.map_err(|e| e.to_string()) } else { Ok(()) };
+    let _ = sqlx::query("SELECT pg_advisory_unlock($1)").bind(verify_lock_key(connection_id)).execute(&mut *guard).await;
+    result.and(recorded)
 }
 
 /// Brings the stored trades and ledger up to date. Each is asked for only what
