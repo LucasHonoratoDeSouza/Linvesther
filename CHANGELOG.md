@@ -8,6 +8,13 @@ All notable changes are recorded here. The format follows
 
 ### Changed
 
+- Images now stay cached for a year instead of 60 seconds after the site's
+  first request for each size, which is what made them look slow to load —
+  every image was already served resized and as WebP (or AVIF), but a stale
+  cache re-encoded the same file on almost every request once traffic was
+  light. The IBKR broker logo now goes through the same resizing and format
+  negotiation as every other image on the site; it used to bypass it.
+
 - `thiserror` upgraded from 1 to 2 across every Rust crate (none of them are on
   the zkVM guest's dependency path, so no proof's image identifier changes).
 

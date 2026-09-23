@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { brokerById } from "./brokers";
 import styles from "./portfolio.module.css";
 
@@ -5,15 +6,15 @@ import styles from "./portfolio.module.css";
  * broker that has none. */
 export function BrokerLogo({ brokerId, size = 34 }: { brokerId: string; size?: number }) {
   const broker = brokerById(brokerId);
+  const logoSize = Math.round(size * 0.8);
   return (
     <span className={styles.brokerLogo} style={{ width: size, height: size }}>
       {broker ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={broker.logo}
           alt={broker.name}
-          width={Math.round(size * 0.8)}
-          height={Math.round(size * 0.8)}
+          width={logoSize}
+          height={logoSize}
           style={broker.roundedLogo ? { borderRadius: "22%" } : undefined}
         />
       ) : (
