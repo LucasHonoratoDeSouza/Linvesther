@@ -16,6 +16,10 @@ const MAX_CANDLES: u64 = 720;
 /// The public rate limit is per address; spacing the calls keeps parallel lookups inside it.
 const PUBLIC_SPACING: Duration = Duration::from_millis(400);
 const RATE_LIMIT_RETRIES: u32 = 3;
+/// Kraken refuses a call whose nonce is not larger than the last it saw for the key. Several
+/// processes using one key at once can arrive out of order, so a refused call is retried with a
+/// newer nonce after a short, uneven pause.
+const NONCE_RETRIES: u32 = 8;
 
 #[derive(Debug, thiserror::Error)]
 pub enum KrakenError {
@@ -98,6 +102,9 @@ pub struct KrakenClient {
     http: reqwest::blocking::Client,
     catalog: Mutex<Option<Arc<Catalog>>>,
     next_public_call: Mutex<Instant>,
+    /// Base of the wait after a rate-limit answer, and after a refused nonce.
+    rate_limit_wait: Duration,
+    nonce_wait: Duration,
 }
 
 fn now_ms() -> u64 {
@@ -118,6 +125,10 @@ fn encode(value: &str) -> String {
 
 fn is_denied(errors: &[String]) -> bool {
     errors.iter().any(|e| e.contains("Permission denied"))
+}
+
+fn is_invalid_nonce(errors: &[String]) -> bool {
+    errors.iter().any(|e| e.contains("Invalid nonce"))
 }
 
 fn is_rate_limited(errors: &[String]) -> bool {
@@ -147,7 +158,16 @@ impl KrakenClient {
             http: reqwest::blocking::Client::builder().user_agent("linvesther-collector").build().expect("the HTTP client can be built"),
             catalog: Mutex::new(None),
             next_public_call: Mutex::new(Instant::now()),
+            rate_limit_wait: Duration::from_secs(5),
+            nonce_wait: Duration::from_millis(150),
         }
+    }
+
+    /// Shorter waits, for a test.
+    pub fn with_waits(mut self, rate_limit: Duration, nonce: Duration) -> Self {
+        self.rate_limit_wait = rate_limit;
+        self.nonce_wait = nonce;
+        self
     }
 
     // ---------- transport ----------------------------------------------
@@ -190,7 +210,9 @@ impl KrakenClient {
     /// A signed private call. Returns the errors alongside the body so the
     /// permission probes can read a refusal as an answer.
     fn private_raw(&self, path: &str, params: &[(&str, String)]) -> Result<(Vec<String>, Value), KrakenError> {
-        for attempt in 0..=RATE_LIMIT_RETRIES {
+        let mut rate_limited = 0;
+        let mut nonce_refused = 0;
+        loop {
             let nonce = next_nonce().to_string();
             let mut post = format!("nonce={nonce}");
             for (key, value) in params {
@@ -208,13 +230,20 @@ impl KrakenClient {
                 .body(post);
             let body = self.call(request, path)?;
             let errors = wire::api_errors(&body);
-            if is_rate_limited(&errors) && attempt < RATE_LIMIT_RETRIES {
-                std::thread::sleep(Duration::from_secs(5 * (attempt as u64 + 1)));
+            if is_rate_limited(&errors) && rate_limited < RATE_LIMIT_RETRIES {
+                rate_limited += 1;
+                std::thread::sleep(self.rate_limit_wait * rate_limited);
+                continue;
+            }
+            if is_invalid_nonce(&errors) && nonce_refused < NONCE_RETRIES {
+                nonce_refused += 1;
+                // The wait grows with each refusal and differs from one process to the next.
+                let jitter = Duration::from_nanos(next_nonce() % 1_000 * self.nonce_wait.as_nanos() as u64 / 1_000);
+                std::thread::sleep(self.nonce_wait * nonce_refused + jitter);
                 continue;
             }
             return Ok((errors, body));
         }
-        unreachable!("the loop returns on its last attempt")
     }
 
     fn private(&self, path: &str, params: &[(&str, String)]) -> Result<Value, KrakenError> {
@@ -593,5 +622,6 @@ mod tests {
         assert!(!is_denied(&["EOrder:Insufficient funds".to_string()]));
         assert!(is_rate_limited(&["EAPI:Rate limit exceeded".to_string()]));
         assert!(!is_rate_limited(&["EGeneral:Permission denied".to_string()]));
+        assert!(is_invalid_nonce(&["EAPI:Invalid nonce".to_string()]) && !is_invalid_nonce(&["EAPI:Rate limit exceeded".to_string()]));
     }
 }

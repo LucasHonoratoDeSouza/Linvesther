@@ -20,6 +20,7 @@ members = [
     "collector/binance/worker",
     "collector/coinbase/client",
     "collector/kraken/client",
+    "collector/wallet/client",
     "collector/ibkr/client",
 ]
 

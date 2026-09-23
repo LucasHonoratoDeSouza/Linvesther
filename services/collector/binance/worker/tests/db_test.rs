@@ -506,6 +506,16 @@ async fn kraken_is_not_called_again_when_the_last_sync_or_check_was_recent_and_n
         }
     };
 
+    // While another request is already checking the key, a second does not try it too.
+    {
+        let mut holder = pool.acquire().await.unwrap();
+        let verify_key = i64::from_le_bytes(id.as_bytes()[..8].try_into().unwrap()) ^ 0x5eed_c0de;
+        let (held,): (bool,) = sqlx::query_as("SELECT pg_try_advisory_lock($1)").bind(verify_key).fetch_one(&mut *holder).await.unwrap();
+        assert!(held);
+        assert!(kraken::verify_if_due(&pool, id, unreachable().await).await.is_ok(), "the check under way is relied on");
+        sqlx::query("SELECT pg_advisory_unlock($1)").bind(verify_key).execute(&mut *holder).await.unwrap();
+    }
+
     // A key never checked is checked; one checked a moment ago is not checked again.
     assert!(kraken::verify_if_due(&pool, id, unreachable().await).await.is_err(), "it tried to reach Kraken");
     kraken::mark_verified(&pool, id).await.unwrap();
