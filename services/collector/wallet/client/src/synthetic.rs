@@ -8,7 +8,7 @@ use crate::reader::{ChainReader, ReadError};
 use crate::wire::{HeldToken, InternalTx, Listing, NormalTx, TokenTransfer};
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 struct State {
@@ -27,14 +27,16 @@ struct State {
     indexer_lag: u64,
 }
 
-/// A chain with one address of interest.
+/// A chain with one address of interest. Clones share the chain, so a test can keep a handle
+/// while the code under test holds another.
+#[derive(Clone)]
 pub struct SyntheticChain {
-    state: Mutex<State>,
+    state: Arc<Mutex<State>>,
 }
 
 impl SyntheticChain {
     pub fn new(head: u64) -> Self {
-        SyntheticChain { state: Mutex::new(State { head, ..State::default() }) }
+        SyntheticChain { state: Arc::new(Mutex::new(State { head, ..State::default() })) }
     }
 
     pub fn set_head(&self, head: u64) {

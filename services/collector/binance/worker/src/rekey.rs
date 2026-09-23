@@ -20,14 +20,14 @@ struct Field {
 struct Table {
     broker: &'static str,
     table: &'static str,
-    fields: [Field; 2],
+    fields: &'static [Field],
 }
 
-const TABLES: [Table; 4] = [
+const TABLES: [Table; 5] = [
     Table {
         broker: "binance",
         table: "binance_connections",
-        fields: [
+        fields: &[
             Field { ciphertext: "encrypted_api_key", nonce: "nonce_api_key", name: "api_key" },
             Field { ciphertext: "encrypted_api_secret", nonce: "nonce_api_secret", name: "api_secret" },
         ],
@@ -35,7 +35,7 @@ const TABLES: [Table; 4] = [
     Table {
         broker: "coinbase",
         table: "coinbase_connections",
-        fields: [
+        fields: &[
             Field { ciphertext: "encrypted_key_name", nonce: "nonce_key_name", name: "key_name" },
             Field { ciphertext: "encrypted_private_key", nonce: "nonce_private_key", name: "private_key" },
         ],
@@ -43,7 +43,7 @@ const TABLES: [Table; 4] = [
     Table {
         broker: "ibkr",
         table: "ibkr_connections",
-        fields: [
+        fields: &[
             Field { ciphertext: "encrypted_token", nonce: "nonce_token", name: "token" },
             Field { ciphertext: "encrypted_query_id", nonce: "nonce_query_id", name: "query_id" },
         ],
@@ -51,10 +51,15 @@ const TABLES: [Table; 4] = [
     Table {
         broker: "kraken",
         table: "kraken_connections",
-        fields: [
+        fields: &[
             Field { ciphertext: "encrypted_api_key", nonce: "nonce_api_key", name: "api_key" },
             Field { ciphertext: "encrypted_api_secret", nonce: "nonce_api_secret", name: "api_secret" },
         ],
+    },
+    Table {
+        broker: "wallet",
+        table: "wallet_connections",
+        fields: &[Field { ciphertext: "encrypted_address", nonce: "nonce_address", name: "address" }],
     },
 ];
 
@@ -79,19 +84,18 @@ fn nonce_of(bytes: Vec<u8>) -> Option<[u8; 12]> {
 async fn run(pool: &PgPool, key: &MasterKey, write: bool) -> Result<RekeyReport, sqlx::Error> {
     let mut report = RekeyReport::default();
     for table in &TABLES {
-        let [a, b] = &table.fields;
-        let select = format!(
-            "SELECT id, account_id, {c1}, {n1}, {c2}, {n2} FROM {t}",
-            c1 = a.ciphertext, n1 = a.nonce, c2 = b.ciphertext, n2 = b.nonce, t = table.table
-        );
+        let columns: Vec<String> = table.fields.iter().flat_map(|f| [f.ciphertext.to_string(), f.nonce.to_string()]).collect();
+        let select = format!("SELECT id, account_id, {} FROM {}", columns.join(", "), table.table);
+        let assignments: Vec<String> = table.fields.iter().enumerate().flat_map(|(i, f)| [format!("{} = ${}", f.ciphertext, 2 * i + 1), format!("{} = ${}", f.nonce, 2 * i + 2)]).collect();
+        let update = format!("UPDATE {} SET {} WHERE id = ${}", table.table, assignments.join(", "), 2 * table.fields.len() + 1);
         for row in sqlx::query(&select).fetch_all(pool).await? {
             report.scanned += 1;
             let id: Uuid = row.get("id");
             let account_id: String = row.get("account_id");
-            let mut fresh = Vec::with_capacity(2);
+            let mut fresh: Vec<(Vec<u8>, Vec<u8>)> = Vec::with_capacity(table.fields.len());
             let mut needs_update = false;
             let mut readable = true;
-            for field in &table.fields {
+            for field in table.fields {
                 let ciphertext: Vec<u8> = row.get(field.ciphertext);
                 let nonce = nonce_of(row.get(field.nonce));
                 let context = credential_context(table.broker, &account_id, field.name);
@@ -122,18 +126,11 @@ async fn run(pool: &PgPool, key: &MasterKey, write: bool) -> Result<RekeyReport,
                 report.already_current += 1;
             } else {
                 if write {
-                    let update = format!(
-                        "UPDATE {t} SET {c1} = $1, {n1} = $2, {c2} = $3, {n2} = $4 WHERE id = $5",
-                        t = table.table, c1 = a.ciphertext, n1 = a.nonce, c2 = b.ciphertext, n2 = b.nonce
-                    );
-                    sqlx::query(&update)
-                        .bind(&fresh[0].0)
-                        .bind(&fresh[0].1)
-                        .bind(&fresh[1].0)
-                        .bind(&fresh[1].1)
-                        .bind(id)
-                        .execute(pool)
-                        .await?;
+                    let mut query = sqlx::query(&update);
+                    for (ciphertext, nonce) in &fresh {
+                        query = query.bind(ciphertext).bind(nonce);
+                    }
+                    query.bind(id).execute(pool).await?;
                 }
                 report.upgraded += 1;
             }
