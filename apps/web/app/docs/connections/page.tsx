@@ -74,8 +74,8 @@ export default function Connections() {
         <p>
           Spot accounts are supported. Kraken cannot tell an application what a
           key may do, so Linvesther checks it by trying, without changing
-          anything: a key that Kraken allows to place an order or list
-          withdrawals is refused. Deposits and withdrawals are read from your
+          anything: a key that Kraken allows to place an order or read
+          withdrawal methods is refused. Deposits and withdrawals are read from your
           Kraken ledger, and staking rewards count as performance, not as money
           you put in. Kraken keeps price history only for a limited time, so a
           very old range may not be drawn at the finest detail.

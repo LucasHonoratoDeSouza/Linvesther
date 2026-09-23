@@ -51,7 +51,9 @@ All notable changes are recorded here. The format follows
   Kraken's guide and a stand-in server; not yet against a real account. The
   permission it asks for that is easiest to miss, "Query ledger entries", sits in
   Kraken's "Data" group, and the instructions and the refusal message now say so.
-  The Kraken logo is the exchange's own mark.
+  The Kraken logo is the exchange's own mark. The withdrawal check asks for the
+  withdrawal methods, not the withdrawal status: Kraken also answers the latter
+  for a key that can read the ledger, so it wrongly refused a correct read-only key.
 
 - Four guides in the documentation (verifiable track records, zero-knowledge
   performance, proving performance without revealing trades, and a comparison of
