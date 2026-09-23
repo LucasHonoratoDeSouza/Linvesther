@@ -27,8 +27,8 @@ pub enum KrakenError {
     Unexpected { path: String, reason: String },
     #[error("Kraken did not accept this API key. Check that the key and the secret were copied whole.")]
     BadKey,
-    #[error("this API key cannot {0}. Create the key again with that permission ticked.")]
-    MissingPermission(&'static str),
+    #[error("this API key cannot {permission}, so Kraken refused it ({said}). Edit the key at Kraken and tick that permission, or create a new key.")]
+    MissingPermission { permission: &'static str, said: String },
     #[error("this API key can do more than read: {0}. Create a key with only the query permissions.")]
     NotReadOnly(String),
     #[error("could not confirm this key is read-only, so it was not accepted ({0})")]
@@ -278,9 +278,11 @@ impl KrakenClient {
     /// The key can read balances, trades and the ledger. Anything missing is
     /// named, so the person knows which box to tick.
     pub fn ensure_can_read(&self) -> Result<(), KrakenError> {
-        self.require("query funds", "/0/private/BalanceEx", &[])?;
-        self.require("query trades", "/0/private/TradesHistory", &[("ofs", "0".into())])?;
-        self.require("query ledger entries", "/0/private/Ledgers", &[("ofs", "0".into())])
+        // Where each one sits in Kraken's key form is part of the message: the ledger
+        // permission is under "Other", away from the funds and orders ones, and is easy to miss.
+        self.require("“Query funds” (under Funds)", "/0/private/BalanceEx", &[])?;
+        self.require("query trades: tick “Query open orders & trades” and “Query closed orders & trades” (under Orders and trades)", "/0/private/TradesHistory", &[("ofs", "0".into())])?;
+        self.require("“Query ledger entries” (under Other)", "/0/private/Ledgers", &[("ofs", "0".into())])
     }
 
     /// The key cannot place orders or withdraw. Kraken has no way to ask a key what
@@ -316,7 +318,7 @@ impl KrakenClient {
             return Ok(());
         }
         if is_denied(&errors) {
-            return Err(KrakenError::MissingPermission(permission));
+            return Err(KrakenError::MissingPermission { permission, said: errors.join(", ") });
         }
         if errors.iter().any(|e| e.contains("Invalid key") || e.contains("Invalid signature")) {
             return Err(KrakenError::BadKey);

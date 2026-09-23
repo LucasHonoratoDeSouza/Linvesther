@@ -59,11 +59,12 @@ export default function Connections() {
             create a new key.
           </li>
           <li>
-            Tick only the query permissions: <strong>Query funds</strong>,{" "}
-            <strong>Query open orders &amp; trades</strong>,{" "}
-            <strong>Query closed orders &amp; trades</strong> and{" "}
-            <strong>Query ledger entries</strong>. Leave order, deposit and
-            withdrawal permissions off.
+            Tick only these four, which sit in different groups:{" "}
+            <strong>Query funds</strong> (under Funds),{" "}
+            <strong>Query open orders &amp; trades</strong> and{" "}
+            <strong>Query closed orders &amp; trades</strong> (under Orders and
+            trades), and <strong>Query ledger entries</strong> (under Other,
+            easy to miss). Leave order, deposit and withdrawal permissions off.
           </li>
           <li>
             Copy the API key and the private key. Kraken shows the private key

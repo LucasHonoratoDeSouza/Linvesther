@@ -48,7 +48,10 @@ All notable changes are recorded here. The format follows
   the ledger instead of inferred. A key that can place orders or withdraw is
   refused, checked by trying without changing anything since Kraken cannot
   report a key's permissions. Verified against the request-signing example in
-  Kraken's guide and a stand-in server; not yet against a real account.
+  Kraken's guide and a stand-in server; not yet against a real account. The
+  permission it asks for that is easiest to miss, "Query ledger entries", sits in
+  Kraken's "Other" group, and the instructions and the refusal message now say so.
+  The Kraken logo is the exchange's own mark.
 
 - Four guides in the documentation (verifiable track records, zero-knowledge
   performance, proving performance without revealing trades, and a comparison of
