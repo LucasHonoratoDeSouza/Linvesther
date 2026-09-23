@@ -83,6 +83,28 @@ export default function Connections() {
       </section>
 
       <section>
+        <h2>On-chain wallet</h2>
+        <ol>
+          <li>Choose Crypto wallet, then pick the wallet installed in your browser and the address to follow.</li>
+          <li>
+            Sign the one message it shows. It only proves the address is yours: it is
+            not a transaction, costs nothing and gives no access to your funds. Linvesther
+            never asks a wallet for anything else.
+          </li>
+        </ol>
+        <p>
+          Your address stays private: it is stored encrypted, shown only to you, and
+          never appears on your public profile, in a claim or in a proof. The public
+          curve of a wallet has at most one point a day, because a finer one could be
+          matched against the address&apos;s public history on its chain. Balances and
+          transfers are read across Ethereum, Base, Arbitrum, Optimism and Polygon
+          (BNB Chain and Avalanche can be enabled by the operator). Money you send in or out counts as a deposit or
+          withdrawal; swaps and gas count as performance. A token with no price makes
+          the metrics unavailable instead of quietly dropping it.
+        </p>
+      </section>
+
+      <section>
         <h2>Interactive Brokers</h2>
         <ol>
           <li>

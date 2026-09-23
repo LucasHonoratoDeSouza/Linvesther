@@ -106,7 +106,7 @@ export const BROKERS: BrokerDefinition[] = [
     logo: "/logos/wallet.svg",
     kind: "onchain",
     method: "wallet",
-    summary: "Ethereum, Base, Arbitrum, Optimism, Polygon, BNB Chain, Avalanche · read-only",
+    summary: "Ethereum, Base, Arbitrum, Optimism, Polygon · read-only",
     instructions: [
       "Choose the wallet installed in your browser and pick the address to follow.",
       "Sign one message to show the address is yours. It is not a transaction: it costs nothing and gives no access to your funds.",
