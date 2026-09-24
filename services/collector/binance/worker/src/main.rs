@@ -284,9 +284,16 @@ async fn ibkr_summary(pool: &sqlx::PgPool, c: &ibkr::IbkrConnection) -> Result<S
     })
 }
 
-/// Market access for the account, read-only verified. For Coinbase the
-/// stored fills and transfers are brought up to date first, since its
-/// history is built from what was collected since connecting.
+/// Market access for the account, read-only verified, that also brings
+/// the account's own stored history up to date first — Coinbase's fills
+/// and transfers, Kraken's trades and flows, a wallet's chain activity —
+/// since building a series or a performance summary needs that fresh.
+/// This is what a real sync (a person's own `binance-sync`, the
+/// scheduler) needs to happen through.
+///
+/// Every branch here writes to the database, so callers behind a
+/// read-only credential must use `open_market_readonly`, below, instead
+/// — see its own doc comment for why.
 async fn open_market(pool: &sqlx::PgPool, key: &MasterKey, account: &Account, now_ms: u64) -> Result<Arc<dyn MarketData>, String> {
     match account {
         Account::Binance(c) => {
@@ -309,6 +316,45 @@ async fn open_market(pool: &sqlx::PgPool, key: &MasterKey, account: &Account, no
             Ok(wallet::market(pool, c.id, prices).await?)
         }
         Account::Ibkr(_) => unreachable!("callers handle Ibkr before reaching open_market"),
+    }
+}
+
+/// The same market access as `open_market`, without ever syncing — no
+/// trade, flow, snapshot, ledger or `last_synced_at` write, on any
+/// exchange. `series` and `performance` need a live market client (for
+/// marking currently-held positions to market) but must build their
+/// answer only from what is already stored; this is the client they
+/// open it with. `pool` here is read from only — stored credentials,
+/// Kraken's already-verified status, a wallet's followed chains — never
+/// written to.
+///
+/// This is the only market-opening path the read-only account API
+/// (`/mcp/account/*`) may reach: a token scoped to `read:account` must
+/// never be able to change any state, and `open_market`'s sync calls are
+/// exactly the state a write-scoped credential is for. Binance's own
+/// path here is identical either way — `open_binance_market` only opens
+/// a client and was never the one syncing.
+async fn open_market_readonly(pool: &sqlx::PgPool, key: &MasterKey, account: &Account) -> Result<Arc<dyn MarketData>, String> {
+    match account {
+        Account::Binance(c) => {
+            let (api_key, api_secret) = decrypt_connection_credential(key, c).ok_or("could not decrypt stored credential")?;
+            open_binance_market(api_key, api_secret).await
+        }
+        Account::Coinbase(c) => {
+            let client = open_coinbase(coinbase::credentials(key, c)?).await?;
+            Ok(client)
+        }
+        Account::Kraken(c) => {
+            let credentials = kraken::credentials(key, c)?;
+            let client = tokio::task::spawn_blocking(move || Arc::new(KrakenClient::new(credentials))).await.map_err(|e| e.to_string())?;
+            Ok(client)
+        }
+        Account::Wallet(c) => {
+            let (_, prices) = wallet_runtime().await?;
+            let client = wallet::market(pool, c.id, prices).await?;
+            Ok(client)
+        }
+        Account::Ibkr(_) => unreachable!("callers handle Ibkr before reaching open_market_readonly"),
     }
 }
 
@@ -592,7 +638,9 @@ async fn run_series() -> Result<SeriesResponse, String> {
     }
 
     let now = now_ms()?;
-    let client = open_market(&pool, &key, &account, now).await?;
+    // Read-only: a series is built purely from what is already stored,
+    // marked to a live price — never from a fresh sync.
+    let client = open_market_readonly(&pool, &key, &account).await?;
     let since_ms = since_ms(&pool, &account).await?;
     let series = match &account {
         Account::Binance(c) => binance_worker::history::load_and_compute_series(&pool, c.id, client, now, range).await,
@@ -1031,7 +1079,9 @@ async fn run_performance() -> Result<PerformanceResponse, String> {
     }
 
     let now = now_ms()?;
-    let client = open_market(&pool, &key, &account, now).await?;
+    // Read-only: performance is built purely from what is already
+    // stored, marked to a live price — never from a fresh sync.
+    let client = open_market_readonly(&pool, &key, &account).await?;
     let history = run_history(&pool, &account, client, now).await?;
     let summary = binance_worker::history::summarize_performance(history);
 
