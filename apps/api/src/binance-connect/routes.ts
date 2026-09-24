@@ -1,6 +1,7 @@
 import { boundedString, boundedStrings } from "../security/input.js";
 import type { RateLimit } from "../auth/rateLimiter.js";
 import type { FastifyInstance } from "fastify";
+import { isOwner } from "../auth/accountOwnership.js";
 import { requireSession } from "../auth/requireSession.js";
 import type { SessionStore } from "../auth/sessionStore.js";
 import { invokeWorker, WorkerInvocationError } from "./worker.js";
@@ -21,28 +22,6 @@ export interface BinanceConnectRouteOptions {
   workerBinaryPath: string;
   /** Proof of ownership for on-chain wallets. Absent: wallets cannot be connected. */
   walletProof?: WalletProofOptions;
-}
-
-/** An address always owns the accountId equal to its own address, and
- * any `<address>_<name>` it adds for further exchange accounts — this
- * lets a signed-in person manage several Binance connections without
- * a prior, separate registration in `accountOwners` (that map still
- * takes precedence when it has an explicit entry). Never grants access
- * to any *other* person's accountId: the prefix must be the caller's
- * own address, and the name part is restricted to a short slug. */
-const EXTRA_ACCOUNT_NAME = /^[A-Za-z0-9-]{1,32}$/;
-
-export function isOwner(accountOwners: Map<string, `0x${string}`>, accountId: string, callerAddress: `0x${string}`): boolean {
-  const registered = accountOwners.get(accountId);
-  if (registered) {
-    return registered.toLowerCase() === callerAddress.toLowerCase();
-  }
-  const caller = callerAddress.toLowerCase();
-  const id = accountId.toLowerCase();
-  if (id === caller) {
-    return true;
-  }
-  return id.startsWith(`${caller}_`) && EXTRA_ACCOUNT_NAME.test(accountId.slice(callerAddress.length + 1));
 }
 
 /** Registers `apps/api/binance-connect`: the real

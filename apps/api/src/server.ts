@@ -26,6 +26,7 @@ import { contractVerifierFromEnv } from "./binance-connect/walletProof.js";
 import { PostgresRateLimiter, type RateLimit } from "./auth/rateLimiter.js";
 import { useVaultNonceStore } from "./auth/vault.js";
 import { MemorySessionStore, PostgresSessionStore, type SessionStore } from "./auth/sessionStore.js";
+import { MemoryReadOnlyTokenStore, PostgresReadOnlyTokenStore, type ReadOnlyTokenStore } from "./auth/readOnlyTokenStore.js";
 import { useWebAuthnCredentialStore, useWebAuthnNonceStores } from "./auth/webauthn.js";
 import { MemoryDisclosureStore, PostgresDisclosureStore, type DisclosureStore } from "./claims/store.js";
 import { MemoryPublicTrackStore } from "./public/store.js";
@@ -117,6 +118,7 @@ if (process.env.DEMO_SEED === "1") {
 // to hide must all outlive a restart, so with a database they live there.
 // Without one (a quick local run) they are kept in memory and lost on restart.
 let sessionStore: SessionStore = new MemorySessionStore();
+let readOnlyTokenStore: ReadOnlyTokenStore = new MemoryReadOnlyTokenStore();
 let disclosureStore: DisclosureStore = new MemoryDisclosureStore();
 let profileSettingsStore: SettingsStore = new MemorySettingsStore();
 let limiterFactory: ((name: string, max: number, windowMs: number) => RateLimit) | undefined;
@@ -129,7 +131,8 @@ if (process.env.DATABASE_URL) {
   const passkeys = new PostgresWebAuthnCredentialStore(pool);
   const disclosures = new PostgresDisclosureStore(pool);
   const settings = new PostgresSettingsStore(pool);
-  await Promise.all([sessions.ensureSchema(), credentials.ensureSchema(), passkeys.ensureSchema(), disclosures.ensureSchema(), settings.ensureSchema()]);
+  const readOnlyTokens = new PostgresReadOnlyTokenStore(pool);
+  await Promise.all([sessions.ensureSchema(), credentials.ensureSchema(), passkeys.ensureSchema(), disclosures.ensureSchema(), settings.ensureSchema(), readOnlyTokens.ensureSchema()]);
   // Challenges and traffic limits are shared too, so several instances behave
   // as one and a restart forgets nothing.
   const nonces = { vault: new PostgresNonceStore(pool, "vault"), registration: new PostgresNonceStore(pool, "webauthn-registration"), authentication: new PostgresNonceStore(pool, "webauthn-authentication") };
@@ -145,16 +148,17 @@ if (process.env.DATABASE_URL) {
   useCredentialStore(credentials);
   useWebAuthnCredentialStore(passkeys);
   sessionStore = sessions;
+  readOnlyTokenStore = readOnlyTokens;
   disclosureStore = disclosures;
   profileSettingsStore = settings;
 } else {
-  console.warn("DATABASE_URL is not set: sign-ins, identities and claims are kept in memory and are lost when the API restarts");
+  console.warn("DATABASE_URL is not set: sign-ins, identities, claims and read-only API tokens are kept in memory and are lost when the API restarts");
 }
 
 // Loaded after the credential store is chosen, since it captures that store.
 const chainLifecycle = await loadChainLifecycle();
 
-const app = buildApp({ domain, trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 0), limiterFactory, proofRateLimiter, limitMultiplier: process.env.TRAFFIC_LIMIT_MULTIPLIER ? Number(process.env.TRAFFIC_LIMIT_MULTIPLIER) : undefined, relayBudgetPerHour: process.env.RELAY_MAX_PER_HOUR ? Number(process.env.RELAY_MAX_PER_HOUR) : undefined, publicTrackStore, sessionStore, disclosureStore, secureCookies: (process.env.WEBAUTHN_ORIGIN ?? "").startsWith("https://"), corsOrigins, chainLifecycle, binanceWorkerBinaryPath, profileSettingsStore, walletProof: { domain, uri: process.env.WEBAUTHN_ORIGIN ?? `http://${domain}`, nonces: walletNonces, verifyContract: contractVerifierFromEnv(process.env) } });
+const app = buildApp({ domain, trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 0), limiterFactory, proofRateLimiter, limitMultiplier: process.env.TRAFFIC_LIMIT_MULTIPLIER ? Number(process.env.TRAFFIC_LIMIT_MULTIPLIER) : undefined, relayBudgetPerHour: process.env.RELAY_MAX_PER_HOUR ? Number(process.env.RELAY_MAX_PER_HOUR) : undefined, publicTrackStore, sessionStore, readOnlyTokenStore, disclosureStore, secureCookies: (process.env.WEBAUTHN_ORIGIN ?? "").startsWith("https://"), corsOrigins, chainLifecycle, binanceWorkerBinaryPath, profileSettingsStore, walletProof: { domain, uri: process.env.WEBAUTHN_ORIGIN ?? `http://${domain}`, nonces: walletNonces, verifyContract: contractVerifierFromEnv(process.env) } });
 
 if (chainLifecycle) {
   // Keeps the indexer's local view continuously close to the chain tip,
