@@ -9,6 +9,17 @@
 // different code (`requireSession` reads only the cookie, and
 // `requireReadOnlyToken` reads only the `Authorization` header), so
 // neither can stand in for the other.
+//
+// The one write this module makes on the read path is `authenticate`'s
+// own `last_used_at` stamp, each time a token is presented — an audit
+// timestamp about the credential itself (so an owner can see an unused
+// token worth revoking on /settings/api-tokens), never a row of account
+// data. It cannot be read back as a balance, a trade or anything else a
+// `/mcp/account/*` route answers with, and it touches no table but this
+// one's own. `authenticate`'s own doc comment covers the one subtlety
+// this write has: it happens in the same atomic statement that decides
+// whether the token is still valid, so recording a use never itself
+// races a revoke.
 
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Pool } from "pg";
@@ -121,6 +132,16 @@ function refusalFor(record: { revokedAt: string | null; expiresAt: string | null
   return null;
 }
 
+/** Whether a record is still the one, fixed scope this store ever issues.
+ * A row some future version wrote with a wider scope — or any value this
+ * version does not itself recognize — must never be accepted here: the
+ * whole point of `read:account` is that every route behind this
+ * middleware trusts it means exactly that, so a mismatch is refused
+ * rather than passed through. */
+function hasReadOnlyScope(record: { scope: string }): boolean {
+  return record.scope === READ_ONLY_SCOPE;
+}
+
 interface StoredToken extends ReadOnlyTokenRecord {
   digest: string;
 }
@@ -158,9 +179,12 @@ export class MemoryReadOnlyTokenStore implements ReadOnlyTokenStore {
     if (!looksLikeReadOnlyToken(presented)) return "unknown";
     const digest = readOnlyTokenDigest(presented);
     const found = this.tokens.find((t) => sameDigest(t.digest, digest));
-    if (!found) return "unknown";
+    if (!found || !hasReadOnlyScope(found)) return "unknown";
     const refusal = refusalFor(found, now);
     if (refusal) return refusal;
+    // Nothing awaits between the check above and this write, so nothing
+    // else can run in between: nowhere in this method can a concurrent
+    // revoke land after the check but before the record is used.
     found.lastUsedAt = now.toISOString();
     return visible(found);
   }
@@ -264,22 +288,32 @@ export class PostgresReadOnlyTokenStore implements ReadOnlyTokenStore {
 
   async authenticate(presented: string, now: Date): Promise<ReadOnlyTokenRecord | TokenRefusal> {
     if (!looksLikeReadOnlyToken(presented)) return "unknown";
-    // The digest is the lookup key, so the database never sees the token
-    // and no query of this table can be made to return one.
-    const found = await this.pool.query<TokenRow>(
-      `SELECT ${COLUMNS} FROM api_read_only_tokens WHERE token_digest = $1`,
-      [readOnlyTokenDigest(presented)],
+    const digest = readOnlyTokenDigest(presented);
+    // One statement decides whether the token authenticates and records
+    // the read, atomically: `revoked_at`/`expires_at`/`scope` are
+    // checked in the same UPDATE that sets `last_used_at`, so no request
+    // can observe a token as live and then have it revoked underneath it
+    // before the read is recorded — a revoke that commits before this
+    // statement runs, however close, is exactly what this refuses. A
+    // prior SELECT-then-UPDATE here could authenticate on a row already
+    // gone stale by the time it wrote back.
+    const authenticated = await this.pool.query<TokenRow>(
+      `UPDATE api_read_only_tokens SET last_used_at = $2
+       WHERE token_digest = $1 AND scope = $3 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > $2)
+       RETURNING ${COLUMNS}`,
+      [digest, now, READ_ONLY_SCOPE],
     );
-    const row = found.rows[0];
-    if (!row) return "unknown";
-    const record = fromRow(row);
-    const refusal = refusalFor(record, now);
-    if (refusal) return refusal;
-    const used = await this.pool.query<TokenRow>(
-      `UPDATE api_read_only_tokens SET last_used_at = $2 WHERE id = $1 RETURNING ${COLUMNS}`,
-      [record.id, now],
-    );
-    return used.rows[0] ? fromRow(used.rows[0]) : record;
+    const row = authenticated.rows[0];
+    if (row) return fromRow(row);
+    // The update above matched nothing: read once more, only to name
+    // *why*, for a caller-facing reason (revoked/expired/unknown) — this
+    // second read never decides authentication, only describes a
+    // decision the UPDATE already made, so a race here cannot turn into
+    // a false accept.
+    const existing = await this.pool.query<TokenRow>(`SELECT ${COLUMNS} FROM api_read_only_tokens WHERE token_digest = $1`, [digest]);
+    const record = existing.rows[0] && fromRow(existing.rows[0]);
+    if (!record || !hasReadOnlyScope(record)) return "unknown";
+    return refusalFor(record, now) ?? "unknown";
   }
 
   async list(address: `0x${string}`): Promise<ReadOnlyTokenRecord[]> {

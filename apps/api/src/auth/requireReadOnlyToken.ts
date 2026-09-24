@@ -13,6 +13,7 @@
 import type { FastifyRequest } from "fastify";
 import {
   MAX_TOKEN_LENGTH,
+  READ_ONLY_SCOPE,
   readOnlyTokenDigest,
   type ReadOnlyScope,
   type ReadOnlyTokenStore,
@@ -52,6 +53,12 @@ export async function requireReadOnlyToken(
   if (!presented) return "unknown";
   const result = await store.authenticate(presented, now);
   if (typeof result === "string") return result;
+  // Belt and suspenders on top of each store's own check: whichever
+  // `ReadOnlyTokenStore` answered — today's two, or one written later —
+  // every route behind this middleware trusts that a principal it
+  // returns really does carry `read:account` and nothing wider. Refused
+  // here, fail closed, rather than assumed.
+  if (result.scope !== READ_ONLY_SCOPE) return "unknown";
   return { tokenId: result.id, address: result.address, scope: result.scope };
 }
 

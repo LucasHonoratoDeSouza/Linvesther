@@ -178,6 +178,23 @@ describe("what a token looks like", () => {
   });
 });
 
+describe("a token's scope is actually checked, not just carried along (postgres)", () => {
+  // issue() only ever writes READ_ONLY_SCOPE, so a mismatched scope can
+  // only arrive here the way a later version of this table, or a bug
+  // elsewhere, would produce one — written directly to prove the
+  // store's own defense, independent of anything that currently issues
+  // tokens.
+  it("refuses a stored row whose scope is not read:account, even though everything else about it is valid", async () => {
+    const store = new PostgresReadOnlyTokenStore(pool);
+    await store.ensureSchema();
+    const address = anAddress();
+    const { token, record } = await store.issue(address, "widened");
+    await pool.query("UPDATE api_read_only_tokens SET scope = $2 WHERE id = $1", [record.id, "read:everything"]);
+
+    expect(await store.authenticate(token, NOW)).toBe("unknown");
+  });
+});
+
 describe("what the database holds for a token (postgres)", () => {
   it("is a hash, so reading the table gives nothing that authenticates", async () => {
     const store = new PostgresReadOnlyTokenStore(pool);
@@ -196,6 +213,48 @@ describe("what the database holds for a token (postgres)", () => {
     await store.ensureSchema();
     const { token } = await store.issue(ME, "Hermes");
     expect(await new PostgresReadOnlyTokenStore(pool).authenticate(token, NOW)).toMatchObject({ address: ME });
+  });
+});
+
+describe("authenticate races a concurrent revoke (postgres)", () => {
+  // A genuine concurrency test, not a timing guess about which async
+  // call "wins": a raw client holds the token's row locked inside an
+  // open, uncommitted revoke, so authenticate's own UPDATE — issued
+  // while that lock is still held — has no choice but to wait for
+  // Postgres to resolve the lock before it can even read the row. There
+  // is exactly one order the database itself can produce here.
+  it("an authenticate whose UPDATE was blocked by an in-flight revoke sees the revoke once it unblocks, never a stale live row", async () => {
+    const store = new PostgresReadOnlyTokenStore(pool);
+    await store.ensureSchema();
+    const address = anAddress();
+    const { token, record } = await store.issue(address, "raced");
+
+    const holder = new pg.Client({ connectionString: DATABASE_URL, options: `-c search_path=${schema}` });
+    await holder.connect();
+    try {
+      await holder.query("BEGIN");
+      // Takes the row's write lock and keeps it — the revoke is "in
+      // flight" on the database for as long as this transaction stays
+      // open, exactly the window the old SELECT-then-UPDATE code could
+      // fall through.
+      await holder.query("UPDATE api_read_only_tokens SET revoked_at = $2 WHERE id = $1", [record.id, NOW]);
+
+      // Issued while the lock is still held: this call's own UPDATE
+      // must block on the same row inside Postgres before it can decide
+      // anything.
+      const authenticating = store.authenticate(token, NOW);
+      // No driver-level signal for "now blocked on a lock" exists to
+      // await instead — a short, generous pause for the query to have
+      // reached and blocked on the server. If it somehow finished
+      // early despite the lock (which would itself be a bug), the
+      // assertion below still catches the wrong answer.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      await holder.query("COMMIT");
+      expect(await authenticating).toBe("revoked");
+    } finally {
+      await holder.end();
+    }
   });
 });
 
@@ -257,5 +316,32 @@ describe("requireReadOnlyToken", () => {
 
     const expired = await store.issue(ME, "expired", { expiresAt: new Date(NOW.getTime() - 1) });
     expect(await requireReadOnlyToken(bearer(expired.token), store, NOW)).toBe("expired");
+  });
+
+  // This middleware is every route's one choke point, so it does not
+  // simply trust whichever ReadOnlyTokenStore answered it — today's two,
+  // or one written later — to have enforced scope itself. A fake store
+  // that hands back a principal-shaped answer with a wider scope proves
+  // the middleware's own check, independent of either real store.
+  it("refuses a principal whose scope is not read:account, even when the store itself vouches for it", async () => {
+    const widened: ReadOnlyTokenStore = {
+      issue: () => {
+        throw new Error("not used by this test");
+      },
+      list: () => Promise.resolve([]),
+      revoke: () => Promise.resolve(false),
+      authenticate: () =>
+        Promise.resolve({
+          id: "fake-token-id",
+          address: ME,
+          label: "a store that does not enforce its own scope",
+          scope: "read:everything" as never,
+          createdAt: NOW.toISOString(),
+          lastUsedAt: null,
+          revokedAt: null,
+          expiresAt: null,
+        }),
+    };
+    expect(await requireReadOnlyToken(bearer("lvz_ro_anything"), widened, NOW)).toBe("unknown");
   });
 });
