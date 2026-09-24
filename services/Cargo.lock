@@ -375,6 +375,7 @@ dependencies = [
  "collector-credentials",
  "exchange-core",
  "reqwest",
+ "rust_decimal",
  "serde",
  "serde_json",
  "thiserror",

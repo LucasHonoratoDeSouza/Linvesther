@@ -36,6 +36,16 @@ struct RawFetch {
     catalog: Option<CatalogSnapshot>,
 }
 
+/// How far back Simple Earn rewards are read the first time.
+const FIRST_EARN_LOOKBACK_MS: u64 = 90 * 24 * 60 * 60 * 1000;
+/// Rewards are read again from this long before the last one stored, so a payment that
+/// reached Binance's records late is still picked up (each is stored once).
+const EARN_OVERLAP_MS: u64 = 2 * 24 * 60 * 60 * 1000;
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
 /// The blocking part: confirms the key is still read-only (permissions
 /// can change after a connection was first created — this is checked
 /// every cycle, not only at connect time), then fetches trades for
@@ -45,6 +55,7 @@ fn fetch_blocking(
     api_key: String,
     api_secret: String,
     symbols: Vec<String>,
+    earn_from_ms: Option<u64>,
 ) -> Result<RawFetch, LiveClientError> {
     let mut client = LiveClient::new(api_key, api_secret, Environment::Production);
     client.ensure_read_only()?;
@@ -56,6 +67,10 @@ fn fetch_blocking(
 
     let mut flows = client.fetch_deposits()?;
     flows.extend(client.fetch_withdrawals()?);
+    // What Simple Earn (and staking through it) paid: performance, not money put in.
+    let now = now_ms();
+    let from = earn_from_ms.map(|t| t.saturating_sub(EARN_OVERLAP_MS)).unwrap_or_else(|| now.saturating_sub(FIRST_EARN_LOOKBACK_MS));
+    flows.extend(client.fetch_earn_rewards(from, now)?);
 
     let catalog = client.fetch_exchange_info().ok();
 
@@ -77,8 +92,8 @@ pub async fn sync_and_persist(
     api_secret: String,
     symbols: Vec<String>,
 ) -> Result<SyncSummary, SyncError> {
-    let fetch =
-        tokio::task::spawn_blocking(move || fetch_blocking(api_key, api_secret, symbols)).await??;
+    let earn_from_ms = db::latest_earn_reward_ms(pool, connection_id).await?;
+    let fetch = tokio::task::spawn_blocking(move || fetch_blocking(api_key, api_secret, symbols, earn_from_ms)).await??;
 
     db::upsert_trades(pool, connection_id, &fetch.trades).await?;
     db::upsert_flows(pool, connection_id, &fetch.flows).await?;
