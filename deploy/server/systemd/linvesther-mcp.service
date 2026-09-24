@@ -1,0 +1,15 @@
+[Unit]
+Description=Linvesther MCP server (read-only account access for agents)
+After=network-online.target linvesther-api.service
+
+[Service]
+WorkingDirectory=%h/linvesther/repo/services/mcp-server
+EnvironmentFile=%h/linvesther/shared/.env
+EnvironmentFile=%h/linvesther/repo/deploy/server/settings.env
+Environment=PATH=%h/.local/opt/node-v24.18.0-linux-x64/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/opt/node-v24.18.0-linux-x64/bin/node node_modules/tsx/dist/cli.mjs src/main.ts
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
