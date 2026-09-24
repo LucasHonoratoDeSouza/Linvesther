@@ -5,7 +5,16 @@ account — connected accounts, current value, positions and profit,
 performance metrics, executed trades and the value/return series — and do
 nothing else.
 
-Transport is Streamable HTTP, per the Model Context Protocol, at `/mcp`.
+Two transports, chosen by `MCP_TRANSPORT` — see "Configuration", below,
+for the trust model behind each:
+
+- **HTTP** (default), Streamable HTTP per the Model Context Protocol, at
+  `/mcp`. Every call must carry its own bearer token; there is no
+  configured fallback, on purpose.
+- **stdio** (`MCP_TRANSPORT=stdio`), for a personal agent that spawns
+  this process directly (Claude Desktop, an IDE, a CLI). Reads with one
+  token this process was started with, since stdio has no per-call
+  credential of its own.
 
 ## The six tools
 
@@ -50,26 +59,48 @@ with another's state.
 | Variable | Meaning |
 | --- | --- |
 | `LINVESTHER_API_URL` | where `apps/api` is (default `http://127.0.0.1:4301`) |
-| `LINVESTHER_READ_ONLY_TOKEN` | the token to read with when a call carries none of its own |
 | `LINVESTHER_API_TIMEOUT_MS` | how long one read may take (default 120000) |
-| `MCP_HOST`, `MCP_PORT` | where to listen (default `127.0.0.1:4302`) |
+| `MCP_TRANSPORT` | `http` (default) or `stdio` |
+| `LINVESTHER_READ_ONLY_TOKEN` | **stdio only** — required there, ignored (with a warning) under `http` |
+| `MCP_HOST`, `MCP_PORT` | HTTP only: where to listen (default `127.0.0.1:4302`) |
+| `MCP_ALLOWED_HOSTS` | HTTP only: comma-separated hostnames to accept on `Host`/`Origin` (default: loopback aliases) |
 
 A token comes from the owner's own `/settings/api-tokens` page. It looks
 like `lvz_ro_…`, reads only that identity's account, and can be revoked
 there at any moment.
 
-There are two ways to give this server a token, and a call's own always
-wins:
+**HTTP never falls back to a configured token.** A tokenless or
+malformed request is refused, in words a caller can act on, whatever
+`LINVESTHER_READ_ONLY_TOKEN` happens to be set to — the type this
+transport builds its server from (`HttpServerOptions`) cannot even carry
+that field, so there is nothing for a fallback to read even if the
+handler tried; `http.ts`'s own doc comment covers the two independent
+guarantees behind that. This is deliberate: falling back to a configured
+token whenever a caller sent none would leak that identity's balance,
+positions and trades to any other caller that reached this port and sent
+nothing at all — exactly the shape of bug this split exists to make
+impossible, not just avoided by convention. Run several identities this
+way by leaving no default configured and having each client present its
+own token as `Authorization: Bearer lvz_ro_…`; it is passed straight
+through to the API, which decides what that token may read.
 
-- **One person, their own agent.** Set
-  `LINVESTHER_READ_ONLY_TOKEN` and run the server locally. Every call
-  reads that identity's account.
-- **Several identities.** Leave it unset and have each client present its
-  own token as `Authorization: Bearer lvz_ro_…` on the MCP request; it is
-  passed through to the API, which decides what that token may read.
+**stdio is the one place a configured token is honored**, because it is
+the one transport with no per-call credential to carry instead: whoever
+can spawn this process and read its stdout already controls everything
+the token would let them read, the same trust boundary any stdio MCP
+server already assumes. `LINVESTHER_READ_ONLY_TOKEN` is required to run
+this way — refused up front, not silently unauthenticated, when it is
+missing.
 
-Because a call's own token always wins, a server configured for one
-person never answers somebody else's call with that person's credential.
+**DNS rebinding protection**, HTTP only: every request's `Host` header —
+and its `Origin`, when it sends one — must name a hostname in
+`MCP_ALLOWED_HOSTS` (default: `localhost`, `127.0.0.1`, `::1`), checked
+before the request reaches the MCP transport at all. This defends
+against a page whose URL names a domain the attacker controls, which
+resolves to `127.0.0.1` only after an initial check passes: the
+browser's own `Host` header on that request names the attacker's domain,
+never `localhost`, so it is refused. Set `MCP_ALLOWED_HOSTS` only for a
+deliberate deployment behind a real hostname.
 
 The default listen address is `127.0.0.1`: this server answers with real
 balances and trades, so exposing it to a network is a deployment
@@ -101,9 +132,20 @@ pnpm --filter @linvestherzk/mcp-server typecheck
   unavailable metric passed through as unavailable, and a refusal from
   the API reported as a failed call.
 - `test/http.test.ts` — a real MCP client over a real socket: the
-  handshake, the token taken from the calling request, the configured
-  fallback, a call with no token reading nothing, the liveness check, and
-  one path serving the protocol.
+  handshake, the token taken from the calling request, a tokenless call
+  refused with nothing read (including with a `defaultToken`-shaped
+  value forced onto the server's options at runtime — the scenario a
+  configured `LINVESTHER_READ_ONLY_TOKEN` plus a tokenless caller would
+  produce, refused all the same), the liveness check, one path serving
+  the protocol, and the DNS-rebinding Host/Origin guard (accepted
+  loopback aliases, a spoofed `Host` refused before any read, an
+  operator-widened allowlist).
+- `test/stdio.test.ts` — the one piece of stdio's own logic: its
+  required `token` becomes `defaultToken` and nothing else about the
+  caller's options changes. (A real handshake over stdio needs a spawned
+  child process — `StdioClientTransport` only ever talks to one, never
+  to injected streams — so it is not exercised here; see this file's own
+  comment.)
 - `test/isolation.test.ts` — the structural guarantees above.
 - `tests/e2e/mcp/mcpServer.e2e.test.ts` — the whole path: a real MCP
   client, this server over HTTP, a real `apps/api` instance, a real

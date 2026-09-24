@@ -10,10 +10,15 @@ export const SERVER_NAME = "linvestherzk-account";
 export const SERVER_VERSION = "0.1.0";
 
 export interface McpServerOptions extends ReadOnlyApiOptions {
-  /** The token to use when a call carries none of its own. Set when one
-   * person runs this server for their own agent; left unset when the
-   * server stands in front of several identities, each presenting its
-   * own token. */
+  /** The token to use when a call carries none of its own.
+   *
+   * Only ever set by `stdio.ts`, where it is required and is the *only*
+   * credential that transport can ever present (stdio has no per-call
+   * header). `http.ts` builds its server from `HttpServerOptions`, a
+   * type that cannot carry this field at all — see that file's own doc
+   * comment for why a network transport must never fall back to a
+   * configured token, silently answering one caller's request with
+   * another identity's account. */
   defaultToken?: string;
 }
 
