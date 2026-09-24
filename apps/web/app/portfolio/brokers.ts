@@ -1,4 +1,4 @@
-import { connectBinance, connectCoinbase, connectIbkr, connectKraken, type ApiResult } from "../../lib/api";
+import { connectBinance, connectCoinbase, connectIbkr, connectKraken, connectWallet, type ApiResult } from "../../lib/api";
 
 /** The one list of places an account can be connected from. The "Add
  * account" popup, the connect form and every account row are all driven
@@ -8,7 +8,7 @@ import { connectBinance, connectCoinbase, connectIbkr, connectKraken, type ApiRe
 export interface BrokerDefinition {
   id: string;
   name: string;
-  kind: "crypto" | "stocks";
+  kind: "crypto" | "stocks" | "onchain";
   /** The broker's own logo (a file under public/), so people recognise it at a glance. */
   logo: string;
   /** Rounds the logo's own corners — for a square asset that isn't already a circle/icon-shaped mark. */
@@ -19,12 +19,15 @@ export interface BrokerDefinition {
   instructions: string[];
   /** What the person pastes in. `secret` fields are hidden as typed. */
   fields: { key: string; label: string; secret: boolean; multiline?: boolean }[];
+  /** "wallet": the person connects by choosing a wallet and signing a message, not by pasting credentials. */
+  method?: "credentials" | "wallet";
   connect: (accountId: string, values: Record<string, string>, label?: string) => Promise<ApiResult<unknown>>;
 }
 
 export const BROKER_KINDS: { kind: BrokerDefinition["kind"]; title: string; empty: string }[] = [
   { kind: "crypto", title: "Crypto exchanges", empty: "More exchanges are coming." },
   { kind: "stocks", title: "Stock brokers", empty: "More brokers are coming." },
+  { kind: "onchain", title: "On-chain wallets", empty: "More wallets are coming." },
 ];
 
 export const BROKERS: BrokerDefinition[] = [
@@ -96,6 +99,21 @@ export const BROKERS: BrokerDefinition[] = [
       { key: "token", label: "Flex Web Service token", secret: true },
     ],
     connect: (accountId, values, label) => connectIbkr(accountId, values["token"] ?? "", values["query-id"] ?? "", label),
+  },
+  {
+    id: "wallet",
+    name: "Crypto wallet",
+    logo: "/logos/wallet.svg",
+    kind: "onchain",
+    method: "wallet",
+    summary: "Ethereum, Base, Arbitrum, Optimism, Polygon · read-only",
+    instructions: [
+      "Choose the wallet installed in your browser and pick the address to follow.",
+      "Sign one message to show the address is yours. It is not a transaction: it costs nothing and gives no access to your funds.",
+      "The address stays private — your public profile shows percentages only, never the address.",
+    ],
+    fields: [],
+    connect: (accountId, values, label) => connectWallet(accountId, values["message"] ?? "", values["signature"] ?? "", label),
   },
 ];
 

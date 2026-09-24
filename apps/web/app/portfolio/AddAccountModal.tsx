@@ -2,16 +2,20 @@ import { useEffect, useState } from "react";
 import { BROKER_KINDS, BROKERS, type BrokerDefinition } from "./brokers";
 import { BrokerLogo } from "./BrokerLogo";
 import { ConnectForm } from "./ConnectForm";
+import { WalletStep } from "./WalletStep";
 import styles from "./portfolio.module.css";
 
 /** "Add account": pick where the account is, then connect it. */
 export function AddAccountModal({
   busy,
   onConnect,
+  accountIdFor,
   onClose,
 }: {
   busy: boolean;
-  onConnect: (broker: BrokerDefinition, values: { label: string; credentials: Record<string, string> }) => Promise<boolean>;
+  /** `accountId` is given when the flow had to choose it before connecting (a wallet signs for one account). */
+  onConnect: (broker: BrokerDefinition, values: { label: string; credentials: Record<string, string> }, accountId?: string) => Promise<boolean>;
+  accountIdFor: (broker: BrokerDefinition, label: string) => string;
   onClose: () => void;
 }) {
   const [broker, setBroker] = useState<BrokerDefinition | null>(null);
@@ -67,7 +71,11 @@ export function AddAccountModal({
             <button type="button" className={styles.linkButton} style={{ padding: 0, marginBottom: 14 }} onClick={() => setBroker(null)}>
               ← Choose another
             </button>
-            <ConnectForm broker={broker} askForName framed={false} submitLabel="Add account" busy={busy} onSubmit={(values) => onConnect(broker, values)} />
+            {broker.method === "wallet" ? (
+              <WalletStep broker={broker} busy={busy} accountIdFor={(label) => accountIdFor(broker, label)} onSubmit={(values, accountId) => onConnect(broker, values, accountId)} />
+            ) : (
+              <ConnectForm broker={broker} askForName framed={false} submitLabel="Add account" busy={busy} onSubmit={(values) => onConnect(broker, values)} />
+            )}
           </>
         )}
       </div>

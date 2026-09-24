@@ -513,9 +513,11 @@ function PortfolioContent() {
                 {selectedAccount && (
                   <div className={styles.dashConnected}>
                     <BrokerLogo brokerId={selectedAccount.broker} size={22} /> {brokerById(selectedAccount.broker)?.name ?? "Account"} connected
-                    <button type="button" className={styles.linkButton} onClick={() => setPanel(panel === "update" ? null : "update")}>
-                      {panel === "update" ? "Cancel" : "Change keys"}
-                    </button>
+                    {brokerById(selectedAccount.broker)?.method !== "wallet" && (
+                      <button type="button" className={styles.linkButton} onClick={() => setPanel(panel === "update" ? null : "update")}>
+                        {panel === "update" ? "Cancel" : "Change keys"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -597,7 +599,8 @@ function PortfolioContent() {
           <AddAccountModal
             busy={connecting}
             onClose={() => setPanel(null)}
-            onConnect={(broker, values) => connectAccount(hasAccounts ? newAccountId(broker, values.label) : address, broker, values)}
+            onConnect={(broker, values, accountId) => connectAccount(accountId ?? (hasAccounts ? newAccountId(broker, values.label) : address), broker, values)}
+            accountIdFor={(broker, label) => (hasAccounts ? newAccountId(broker, label) : address)}
           />
         )}
       </main>

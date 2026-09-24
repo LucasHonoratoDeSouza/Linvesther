@@ -71,11 +71,11 @@ const series = {
 /** A stand-in for the real worker: answers `list`, `performance` and
  * `series` the way the Rust binary does, and logs every call so the tests
  * can tell how often it was actually run. */
-function fakeWorker(accountIds: string[]) {
+function fakeWorker(accountIds: string[], broker?: string, answer: typeof series = series) {
   const dir = mkdtempSync(join(tmpdir(), "profile-worker-"));
   const path = join(dir, "worker.sh");
   const log = join(dir, "calls.log");
-  const accounts = accountIds.map((accountId) => ({ accountId, label: null, connectedAtMs: CONNECTED_AT, status: "active" }));
+  const accounts = accountIds.map((accountId) => ({ accountId, label: null, connectedAtMs: CONNECTED_AT, status: "active", ...(broker ? { broker } : {}) }));
   writeFileSync(
     path,
     `#!/bin/sh
@@ -85,7 +85,7 @@ echo "$sub" >> ${log}
 case "$sub" in
   list) echo '${JSON.stringify({ ok: true, accounts })}' ;;
   performance) echo '${JSON.stringify({ ok: true, ...performance })}' ;;
-  series) echo '${JSON.stringify({ ok: true, ...series })}' ;;
+  series) echo '${JSON.stringify({ ok: true, ...answer })}' ;;
   collector-identity) echo '${JSON.stringify({ ok: true, fingerprintHex: COLLECTOR })}' ;;
 esac
 `,
@@ -94,9 +94,9 @@ esac
   return { path, calls: (name: string) => readFileSync(log, "utf8").split("\n").filter((line) => line === name).length };
 }
 
-async function setup(accountIds: string[] = [ME], startAt = NOW) {
+async function setup(accountIds: string[] = [ME], startAt = NOW, broker?: string, answer?: typeof series) {
   let clock = startAt;
-  const worker = fakeWorker(accountIds);
+  const worker = fakeWorker(accountIds, broker, answer);
   const sessionStore = new MemorySessionStore();
   const app = buildApp({ domain: "localhost", sessionStore, binanceWorkerBinaryPath: worker.path, now: () => clock });
   await app.ready();
@@ -198,6 +198,17 @@ describe("the public return curve", () => {
     ]);
     expect(JSON.stringify(response.json())).not.toContain('"nav"');
     expect(JSON.stringify(response.json())).not.toContain("25000");
+  });
+
+  it("gives a wallet's curve at most once a day, so it cannot be matched to the address on its chain", async () => {
+    const hourly = { ...series, stepMs: 3_600_000, points: Array.from({ length: 72 }, (_, i) => ({ timeMs: CONNECTED_AT + i * 3_600_000, nav: "1000", index: String(1 + i / 1000) })) };
+    const wallet = await setup([ME], NOW, "wallet", hourly);
+    const days = new Set(hourly.points.map((p) => Math.floor(p.timeMs / 86_400_000))).size;
+    const points = (await curve(wallet.app, ME)).json().points as { timeMs: number }[];
+    expect(points).toHaveLength(days);
+    expect(new Set(points.map((p) => Math.floor(p.timeMs / 86_400_000))).size).toBe(points.length);
+    const exchange = await setup([ME], NOW, "kraken", hourly);
+    expect((await curve(exchange.app, ME)).json().points).toHaveLength(72);
   });
 
   it("is missing in privacy mode, for an empty address, and for a bad range", async () => {

@@ -162,6 +162,18 @@ pub async fn upsert_flows(
     Ok(())
 }
 
+/// When the latest Simple Earn reward already stored was paid, if any — where the next
+/// read of the rewards picks up.
+pub async fn latest_earn_reward_ms(pool: &PgPool, connection_id: Uuid) -> Result<Option<u64>, sqlx::Error> {
+    let (latest,): (Option<i64>,) = sqlx::query_as(
+        "SELECT max(economic_time_ms) FROM binance_synced_flows WHERE connection_id = $1 AND source_id LIKE 'earn:%'",
+    )
+    .bind(connection_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(latest.map(|t| t as u64))
+}
+
 pub async fn upsert_catalog_snapshot(
     pool: &PgPool,
     connection_id: Uuid,

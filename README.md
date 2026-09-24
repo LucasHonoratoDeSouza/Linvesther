@@ -41,7 +41,7 @@ owner authorizes one by one.
 
 | | |
 | --- | --- |
-| **Read-only connections** | Binance, Coinbase, Kraken and Interactive Brokers. Keys that can trade or withdraw are rejected. |
+| **Read-only connections** | Binance, Coinbase, Kraken, Interactive Brokers and on-chain wallets (Ethereum, Base, Arbitrum, Optimism, Polygon; BNB Chain and Avalanche optional). Keys that can trade or withdraw are rejected; a wallet is linked by signing one message and its address stays private. |
 | **One combined record** | All connected accounts are added together. You cannot pick the flattering ones. |
 | **Percentages only** | Return, max drawdown, Sharpe ratio and win rate. Never an amount. |
 | **Claims** | A signed statement like "return at least 10%", shared as a link. It shows the threshold, not the figure. |

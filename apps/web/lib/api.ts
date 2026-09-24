@@ -197,6 +197,23 @@ export function connectKraken(accountId: string, apiKey: string, apiSecret: stri
   });
 }
 
+/** The message a wallet signs to show it holds `address` — it moves nothing. */
+export function requestWalletChallenge(accountId: string, address: string, chainId: number): Promise<ApiResult<{ message: string }>> {
+  return call(`/accounts/${accountId}/wallet-challenge`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ address, chainId }),
+  });
+}
+
+export function connectWallet(accountId: string, message: string, signature: string, label?: string): Promise<ApiResult<BinanceConnectResult>> {
+  return call(`/accounts/${accountId}/wallet-connection`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message, signature, label }),
+  });
+}
+
 export function renameAccount(accountId: string, label: string): Promise<ApiResult<{ label: string }>> {
   return call(`/accounts/${accountId}/label`, {
     method: "PATCH",

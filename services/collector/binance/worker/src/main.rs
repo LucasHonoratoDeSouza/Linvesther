@@ -21,10 +21,11 @@
 //! environment.
 
 use binance_worker::crypto::{credential_context, decrypt, encrypt, MasterKey};
-use binance_worker::{coinbase, db, ibkr, kraken, stream, sync};
+use binance_worker::{coinbase, db, ibkr, kraken, stream, sync, wallet};
 use coinbase_client::{CoinbaseClient, Credentials};
 use ibkr_client::{Credentials as IbkrCredentials, IbkrClient};
 use kraken_client::KrakenClient;
+use wallet_client::{PriceProvider, PriceSource};
 use exchange_core::MarketData;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -38,8 +39,9 @@ use uuid::Uuid;
 struct ConnectRequest {
     #[serde(rename = "accountId")]
     account_id: String,
-    /// "binance" (default), "coinbase", "kraken" or "ibkr". Kraken takes
-    /// `apiKey` and `apiSecret` like Binance does.
+    /// "binance" (default), "coinbase", "kraken", "ibkr" or "wallet". Kraken takes
+    /// `apiKey` and `apiSecret` like Binance does; a wallet takes its `address` (ownership
+    /// is proved by the API before the worker is asked to connect it).
     #[serde(default)]
     exchange: Option<String>,
     #[serde(rename = "apiKey", default)]
@@ -57,6 +59,9 @@ struct ConnectRequest {
     token: String,
     #[serde(rename = "queryId", default)]
     query_id: String,
+    /// A wallet: the EVM address to read.
+    #[serde(default)]
+    address: String,
     /// Optional name the person gives this connected account.
     #[serde(default)]
     label: Option<String>,
@@ -194,6 +199,7 @@ enum Account {
     Coinbase(coinbase::CoinbaseConnection),
     Ibkr(ibkr::IbkrConnection),
     Kraken(kraken::KrakenConnection),
+    Wallet(wallet::WalletConnection),
 }
 
 async fn resolve(pool: &sqlx::PgPool, account_id: &str) -> Result<Account, String> {
@@ -208,6 +214,9 @@ async fn resolve(pool: &sqlx::PgPool, account_id: &str) -> Result<Account, Strin
     }
     if let Some(c) = kraken::find_by_account(pool, account_id).await.map_err(|e| e.to_string())? {
         return Ok(Account::Kraken(c));
+    }
+    if let Some(c) = wallet::find_by_account(pool, account_id).await.map_err(|e| e.to_string())? {
+        return Ok(Account::Wallet(c));
     }
     Err(format!("no connection for account {account_id}"))
 }
@@ -229,6 +238,28 @@ async fn open_kraken(pool: &sqlx::PgPool, key: &MasterKey, connection: &kraken::
     let client = tokio::task::spawn_blocking(move || Arc::new(KrakenClient::new(credentials))).await.map_err(|e| e.to_string())?;
     kraken::verify_if_due(pool, connection.id, client.clone()).await?;
     Ok(client)
+}
+
+/// What reading a wallet needs: which networks and with which keys (from the environment), and a
+/// price source. The blocking HTTP client is built where blocking is allowed.
+async fn wallet_runtime() -> Result<(Arc<wallet::WalletSettings>, Arc<dyn PriceProvider>), String> {
+    let settings = Arc::new(wallet::WalletSettings::from_env()?);
+    let prices = tokio::task::spawn_blocking(|| Arc::new(PriceSource::default()) as Arc<dyn PriceProvider>).await.map_err(|e| e.to_string())?;
+    Ok((settings, prices))
+}
+
+/// Reads a stored wallet: the networks it already follows, unless it is being read for the
+/// first time, in which case the deployment's networks.
+async fn sync_wallet(pool: &sqlx::PgPool, key: &MasterKey, connection: &wallet::WalletConnection, force: bool) -> Result<(), String> {
+    let (settings, prices) = wallet_runtime().await?;
+    let address = wallet::stored_address(key, connection)?;
+    let followed = wallet::followed_chains(pool, connection.id).await?;
+    let chains = if followed.is_empty() { settings.chains.clone() } else { followed };
+    wallet::sync(pool, connection, &address, &chains, settings, prices, now_ms()?, force).await
+}
+
+async fn wallet_summary(pool: &sqlx::PgPool, c: &wallet::WalletConnection) -> Result<SyncSummaryJson, String> {
+    Ok(SyncSummaryJson { trades_fetched: 0, flows_fetched: wallet::flows(pool, c.id).await?.len(), catalog_symbols_fetched: 0 })
 }
 
 /// `reqwest::blocking::Client` must be built, used and dropped entirely
@@ -269,6 +300,11 @@ async fn open_market(pool: &sqlx::PgPool, key: &MasterKey, account: &Account, no
             kraken::sync(pool, c, client.clone(), false).await?;
             Ok(client)
         }
+        Account::Wallet(c) => {
+            sync_wallet(pool, key, c, false).await?;
+            let (_, prices) = wallet_runtime().await?;
+            Ok(wallet::market(pool, c.id, prices).await?)
+        }
         Account::Ibkr(_) => unreachable!("callers handle Ibkr before reaching open_market"),
     }
 }
@@ -295,6 +331,11 @@ async fn run_history(pool: &sqlx::PgPool, account: &Account, client: Arc<dyn Mar
             let since = kraken::created_at_ms(pool, c.id).await.map_err(|e| e.to_string())?;
             binance_worker::history::history_from(trades, flows, since, client, now).await.map_err(|e| e.to_string())
         }
+        Account::Wallet(c) => {
+            let flows = wallet::flows(pool, c.id).await?;
+            let since = wallet::created_at_ms(pool, c.id).await.map_err(|e| e.to_string())?;
+            binance_worker::history::history_from(Vec::new(), flows, since, client, now).await.map_err(|e| e.to_string())
+        }
         Account::Ibkr(_) => unreachable!("callers handle Ibkr before reaching run_history"),
     }
 }
@@ -305,6 +346,7 @@ async fn since_ms(pool: &sqlx::PgPool, account: &Account) -> Result<u64, String>
         Account::Coinbase(c) => coinbase::created_at_ms(pool, c.id).await.map_err(|e| e.to_string()),
         Account::Ibkr(c) => ibkr::created_at_ms(pool, c.id).await.map_err(|e| e.to_string()),
         Account::Kraken(c) => kraken::created_at_ms(pool, c.id).await.map_err(|e| e.to_string()),
+        Account::Wallet(c) => wallet::created_at_ms(pool, c.id).await.map_err(|e| e.to_string()),
     }
 }
 
@@ -347,6 +389,27 @@ async fn run_connect() -> Result<ConnectResponse, String> {
             .ok_or("connection vanished")?;
         ibkr::sync(&pool, &connection, client, now_ms()?).await?;
         return Ok(ConnectResponse { connection_id: id.to_string(), summary: ibkr_summary(&pool, &connection).await? });
+    }
+
+    if request.exchange.as_deref() == Some("wallet") {
+        let address = request.address.trim().to_lowercase();
+        if !wallet::is_address(&address) {
+            return Err("that is not a wallet address".to_string());
+        }
+        let (settings, prices) = wallet_runtime().await?;
+        let existing = wallet::find_by_account(&pool, &request.account_id).await.map_err(|e| e.to_string())?;
+        let id = wallet::insert_connection(&pool, &key, &request.account_id, &address, label.as_deref()).await?;
+        let connection = wallet::find_by_account(&pool, &request.account_id).await.map_err(|e| e.to_string())?.ok_or("connection vanished")?;
+        let followed = wallet::followed_chains(&pool, id).await?;
+        let chains = if followed.is_empty() { settings.chains.clone() } else { followed };
+        if let Err(error) = wallet::sync(&pool, &connection, &address, &chains, settings, prices, now_ms()?, true).await {
+            // A connection that could not be read at all is not kept; one that already existed is left as it was.
+            if existing.is_none() {
+                let _ = wallet::delete_connection(&pool, id).await;
+            }
+            return Err(error);
+        }
+        return Ok(ConnectResponse { connection_id: id.to_string(), summary: wallet_summary(&pool, &connection).await? });
     }
 
     if request.exchange.as_deref() == Some("kraken") {
@@ -468,6 +531,10 @@ async fn run_sync() -> Result<SyncSummaryJson, String> {
             kraken::sync(&pool, &connection, client, true).await?;
             kraken_summary(&pool, &connection).await
         }
+        Account::Wallet(connection) => {
+            sync_wallet(&pool, &key, &connection, true).await?;
+            wallet_summary(&pool, &connection).await
+        }
     }
 }
 
@@ -536,6 +603,10 @@ async fn run_series() -> Result<SeriesResponse, String> {
             let flows = kraken::flows(&pool, c.id).await?;
             binance_worker::history::series_from(trades, flows, since_ms, client, now, range).await
         }
+        Account::Wallet(c) => {
+            let flows = wallet::flows(&pool, c.id).await?;
+            binance_worker::history::series_from(Vec::new(), flows, since_ms, client, now, range).await
+        }
         Account::Ibkr(_) => unreachable!("handled above"),
     }
     .map_err(|e| e.to_string())?;
@@ -574,6 +645,7 @@ async fn run_list() -> Result<ListResponse, String> {
     accounts.extend(coinbase::owned_by(&pool, &request.owner_address).await.map_err(|e| e.to_string())?);
     accounts.extend(ibkr::owned_by(&pool, &request.owner_address).await.map_err(|e| e.to_string())?);
     accounts.extend(kraken::owned_by(&pool, &request.owner_address).await.map_err(|e| e.to_string())?);
+    accounts.extend(wallet::owned_by(&pool, &request.owner_address).await.map_err(|e| e.to_string())?);
     accounts.sort_by_key(|a| a.connected_at_ms);
     Ok(ListResponse { accounts })
 }
@@ -602,6 +674,7 @@ async fn run_rename() -> Result<RenameResponse, String> {
         Account::Coinbase(c) => coinbase::set_label(&pool, c.id, &label).await,
         Account::Ibkr(c) => ibkr::set_label(&pool, c.id, &label).await,
         Account::Kraken(c) => kraken::set_label(&pool, c.id, &label).await,
+        Account::Wallet(c) => wallet::set_label(&pool, c.id, &label).await,
     }
     .map_err(|e| e.to_string())?;
     Ok(RenameResponse { label })
@@ -623,6 +696,7 @@ async fn run_disconnect() -> Result<DisconnectResponse, String> {
         Account::Coinbase(c) => ("coinbase", coinbase::delete_connection(&pool, c.id).await),
         Account::Ibkr(c) => ("ibkr", ibkr::delete_connection(&pool, c.id).await),
         Account::Kraken(c) => ("kraken", kraken::delete_connection(&pool, c.id).await),
+        Account::Wallet(c) => ("wallet", wallet::delete_connection(&pool, c.id).await),
     };
     Ok(DisconnectResponse { removed: removed.map_err(|e| e.to_string())?, broker })
 }
@@ -641,6 +715,16 @@ async fn run_status() -> Result<db::ConnectionSummary, String> {
     let pool = pool().await?;
     if let Some(c) = coinbase::find_by_account(&pool, &request.account_id).await.map_err(|e| e.to_string())? {
         let counts = coinbase_summary(&pool, &c).await?;
+        return Ok(db::ConnectionSummary {
+            connected: true,
+            status: Some(c.status),
+            last_synced_at: c.last_synced_at,
+            trade_count: counts.trades_fetched as i64,
+            flow_count: counts.flows_fetched as i64,
+        });
+    }
+    if let Some(c) = wallet::find_by_account(&pool, &request.account_id).await.map_err(|e| e.to_string())? {
+        let counts = wallet_summary(&pool, &c).await?;
         return Ok(db::ConnectionSummary {
             connected: true,
             status: Some(c.status),
@@ -709,6 +793,10 @@ async fn run_nav() -> Result<NavResponse, String> {
         Account::Binance(_) => open_market(&pool, &key, &account, 0).await?,
         Account::Coinbase(c) => open_coinbase(coinbase::credentials(&key, c)?).await?,
         Account::Kraken(c) => open_kraken(&pool, &key, c).await?,
+        Account::Wallet(c) => {
+            let (_, prices) = wallet_runtime().await?;
+            wallet::market(&pool, c.id, prices).await?
+        }
         Account::Ibkr(_) => unreachable!("handled above"),
     };
     let quote_currency = client.quote_currency().to_string();
@@ -1113,6 +1201,18 @@ async fn run_scheduler() -> Result<(), String> {
                 }
             }
             Err(e) => eprintln!("could not query due kraken connections: {e}"),
+        }
+
+        match wallet::due_for_sync(&pool, interval_seconds).await {
+            Ok(due) => {
+                for connection in due {
+                    match sync_wallet(&pool, &key, &connection, false).await {
+                        Ok(()) => eprintln!("synced wallet {}", connection.account_id),
+                        Err(e) => eprintln!("wallet sync failed for {}: {e}", connection.account_id),
+                    }
+                }
+            }
+            Err(e) => eprintln!("could not query due wallet connections: {e}"),
         }
 
         match ibkr::due_for_sync(&pool, interval_seconds).await {

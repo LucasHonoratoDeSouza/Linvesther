@@ -8,7 +8,7 @@ use crate::reader::{ChainReader, ReadError};
 use crate::wire::{HeldToken, InternalTx, Listing, NormalTx, TokenTransfer};
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 struct State {
@@ -27,14 +27,16 @@ struct State {
     indexer_lag: u64,
 }
 
-/// A chain with one address of interest.
+/// A chain with one address of interest. Clones share the chain, so a test can keep a handle
+/// while the code under test holds another.
+#[derive(Clone)]
 pub struct SyntheticChain {
-    state: Mutex<State>,
+    state: Arc<Mutex<State>>,
 }
 
 impl SyntheticChain {
     pub fn new(head: u64) -> Self {
-        SyntheticChain { state: Mutex::new(State { head, ..State::default() }) }
+        SyntheticChain { state: Arc::new(Mutex::new(State { head, ..State::default() })) }
     }
 
     pub fn set_head(&self, head: u64) {
@@ -175,6 +177,8 @@ impl ChainReader for SyntheticChain {
 #[derive(Default)]
 pub struct SyntheticPrices {
     fixed: Mutex<BTreeMap<String, Decimal>>,
+    /// coin -> (from this moment on, this price), oldest first.
+    schedules: Mutex<BTreeMap<String, Vec<(u64, Decimal)>>>,
 }
 
 impl SyntheticPrices {
@@ -185,23 +189,40 @@ impl SyntheticPrices {
     pub fn set(&self, coin: &str, usd: Decimal) {
         self.fixed.lock().unwrap().insert(coin.to_string(), usd);
     }
+
+    /// A price that changes with time: `changes` are `(from this moment on, this price)`.
+    pub fn set_schedule(&self, coin: &str, changes: &[(u64, Decimal)]) {
+        let mut changes = changes.to_vec();
+        changes.sort_by_key(|(at, _)| *at);
+        self.schedules.lock().unwrap().insert(coin.to_string(), changes);
+    }
+
+    fn price_at(&self, coin: &str, at_ms: u64) -> Option<Decimal> {
+        if let Some(changes) = self.schedules.lock().unwrap().get(coin) {
+            return changes.iter().rev().find(|(from, _)| *from <= at_ms).or_else(|| changes.first()).map(|(_, price)| *price);
+        }
+        self.fixed.lock().unwrap().get(coin).copied()
+    }
+
+    fn latest(&self, coin: &str) -> Option<Decimal> {
+        if let Some(changes) = self.schedules.lock().unwrap().get(coin) {
+            return changes.last().map(|(_, price)| *price);
+        }
+        self.fixed.lock().unwrap().get(coin).copied()
+    }
 }
 
 impl PriceProvider for SyntheticPrices {
     fn current(&self, coins: &[String]) -> Result<BTreeMap<String, Price>, PriceError> {
-        let fixed = self.fixed.lock().unwrap();
-        Ok(coins.iter().filter_map(|c| fixed.get(c).map(|p| (c.clone(), Price { usd: *p, at_ms: 0 }))).collect())
+        Ok(coins.iter().filter_map(|c| self.latest(c).map(|p| (c.clone(), Price { usd: p, at_ms: 0 }))).collect())
     }
 
     fn at(&self, coins: &[String], at_ms: u64) -> Result<BTreeMap<String, Price>, PriceError> {
-        let fixed = self.fixed.lock().unwrap();
-        Ok(coins.iter().filter_map(|c| fixed.get(c).map(|p| (c.clone(), Price { usd: *p, at_ms }))).collect())
+        Ok(coins.iter().filter_map(|c| self.price_at(c, at_ms).map(|p| (c.clone(), Price { usd: p, at_ms }))).collect())
     }
 
     fn chart(&self, coin: &str, start_ms: u64, end_ms: u64, interval_ms: u64) -> Result<Vec<(u64, Decimal)>, PriceError> {
-        let fixed = self.fixed.lock().unwrap();
-        let Some(price) = fixed.get(coin) else { return Ok(Vec::new()) };
         let step = interval_ms.max(300_000);
-        Ok((0..).map(|i| start_ms + i * step).take_while(|t| *t <= end_ms).map(|t| (t, *price)).collect())
+        Ok((0..).map(|i| start_ms + i * step).take_while(|t| *t <= end_ms).filter_map(|t| self.price_at(coin, t).map(|p| (t, p))).collect())
     }
 }

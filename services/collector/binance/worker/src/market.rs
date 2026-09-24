@@ -57,8 +57,9 @@ impl MarketData for BinanceMarket {
     }
 
     fn fetch_account_balances(&self) -> Result<Vec<AccountBalance>, MarketError> {
+        // Spot plus Simple Earn: funds moved into Earn are still the account's.
         self.client
-            .fetch_account_balances()
+            .fetch_balances_with_earn()
             .map_err(|e| failed("balances", e))
     }
 

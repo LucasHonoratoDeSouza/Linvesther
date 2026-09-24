@@ -14,6 +14,8 @@
 //! `binance-flows` — this crate does no normalization of its own beyond
 //! mapping the wire JSON onto those crates' `Raw*`/input types.
 
+pub mod earn;
+
 use binance_catalog::CatalogSnapshot;
 use binance_flows::{
     normalize_deposit, normalize_withdrawal, NormalizedFlow, RawDeposit, RawWithdrawal,
@@ -52,6 +54,8 @@ pub enum LiveClientError {
     ReadOnlyNotConfirmed,
     #[error("binance returned an error: code={code} msg={msg}")]
     ApiError { code: i64, msg: String },
+    #[error("Simple Earn answer not understood: {0}")]
+    Earn(String),
     #[error("flow normalization failed: {0}")]
     Flow(#[from] binance_flows::FlowError),
     #[error("catalog archiving failed: {0}")]
@@ -392,6 +396,64 @@ impl LiveClient {
             })
             .collect();
         Ok(balances)
+    }
+
+    /// Every page of a Simple Earn listing at `path`, until all its rows are read.
+    fn earn_pages<T>(
+        &self,
+        path: &str,
+        extra: &[(&str, String)],
+        parse: impl Fn(&serde_json::Value) -> Result<earn::Page<T>, String>,
+    ) -> Result<Vec<T>, LiveClientError> {
+        let mut rows = Vec::new();
+        for current in 1u64.. {
+            let mut params = extra.to_vec();
+            params.push(("current", current.to_string()));
+            params.push(("size", earn::PAGE_SIZE.to_string()));
+            let body = self.signed_get(path, &params)?;
+            let page = parse(&body).map_err(|reason| LiveClientError::Earn(format!("{path}: {reason}")))?;
+            let empty = page.rows.is_empty();
+            rows.extend(page.rows);
+            if empty || rows.len() as u64 >= page.total {
+                break;
+            }
+        }
+        Ok(rows)
+    }
+
+    /// What is held in Simple Earn, flexible and locked. Reading these needs no more than
+    /// the read permission the key already has.
+    pub fn fetch_earn_positions(&self) -> Result<Vec<earn::EarnPosition>, LiveClientError> {
+        let mut positions = self.earn_pages("/sapi/v1/simple-earn/flexible/position", &[], |b| earn::parse_positions(b, earn::EarnKind::Flexible))?;
+        positions.extend(self.earn_pages("/sapi/v1/simple-earn/locked/position", &[], |b| earn::parse_positions(b, earn::EarnKind::Locked))?);
+        Ok(positions)
+    }
+
+    /// The spot balances together with what is held in Simple Earn: the account's whole
+    /// holding, so moving funds between the two changes nothing.
+    pub fn fetch_balances_with_earn(&self) -> Result<Vec<AccountBalance>, LiveClientError> {
+        let spot = self.fetch_account_balances()?;
+        let positions = self.fetch_earn_positions()?;
+        earn::with_earn(spot, &positions).map_err(LiveClientError::Earn)
+    }
+
+    /// Rewards Simple Earn paid between `start_ms` and `end_ms`, as credits. Binance answers
+    /// at most 30 days at a time, so the span is read in windows.
+    pub fn fetch_earn_rewards(&self, start_ms: u64, end_ms: u64) -> Result<Vec<NormalizedFlow>, LiveClientError> {
+        let mut flows = Vec::new();
+        let mut from = start_ms;
+        while from < end_ms {
+            let to = (from + earn::REWARDS_WINDOW_MS).min(end_ms);
+            let window = [("startTime", from.to_string()), ("endTime", to.to_string())];
+            for reward_type in ["BONUS", "REALTIME", "REWARDS"] {
+                let mut params = window.to_vec();
+                params.push(("type", reward_type.to_string()));
+                flows.extend(self.earn_pages("/sapi/v1/simple-earn/flexible/history/rewardsRecord", &params, |b| earn::parse_rewards(b, earn::EarnKind::Flexible))?);
+            }
+            flows.extend(self.earn_pages("/sapi/v1/simple-earn/locked/history/rewardsRecord", &window, |b| earn::parse_rewards(b, earn::EarnKind::Locked))?);
+            from = to;
+        }
+        Ok(flows)
     }
 
     /// `GET /api/v3/klines` for `symbol`/`interval`, most recent

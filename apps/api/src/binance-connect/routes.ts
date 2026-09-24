@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { requireSession } from "../auth/requireSession.js";
 import type { SessionStore } from "../auth/sessionStore.js";
 import { invokeWorker, WorkerInvocationError } from "./worker.js";
+import { issueWalletChallenge, verifyWalletProof, type WalletProofOptions } from "./walletProof.js";
 import { SERIES_RANGES, type SeriesRange } from "./types.js";
 import type { BinanceSeries, BinanceConnectionStatus, BinanceConnectRequest, CoinbaseConnectRequest, IbkrConnectRequest, KrakenConnectRequest, ConnectedAccount, BinanceConnectResult, BinanceNav, BinancePerformance, BinancePerformanceProof } from "./types.js";
 
@@ -18,6 +19,8 @@ export interface BinanceConnectRouteOptions {
   onAccountRemoved?: (ownerAddress: `0x${string}`, accountId: string) => void;
   /** Path to the compiled `binance-worker` binary. */
   workerBinaryPath: string;
+  /** Proof of ownership for on-chain wallets. Absent: wallets cannot be connected. */
+  walletProof?: WalletProofOptions;
 }
 
 /** An address always owns the accountId equal to its own address, and
@@ -234,6 +237,67 @@ export function registerBinanceConnectRoutes(app: FastifyInstance, options: Bina
     } catch (error) {
       if (error instanceof WorkerInvocationError) {
         return reply.code(422).send({ error: "kraken_connection_failed", detail: error.message });
+      }
+      throw error;
+    }
+  });
+
+  // Connecting a wallet takes two steps: ask for a message to sign, then send it back
+  // signed. The address is only ever read from the signed message and goes to the worker;
+  // no response from this service carries it.
+  app.post<{ Params: { accountId: string }; Body: unknown }>("/accounts/:accountId/wallet-challenge", async (request, reply) => {
+    const session = await requireSession(request, options.sessionStore);
+    if (!session) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+    if (!isOwner(options.accountOwners, request.params.accountId, session.address)) {
+      return reply.code(403).send({ error: "cross_account_access_denied" });
+    }
+    if (!options.walletProof) {
+      return reply.code(503).send({ error: "wallets_unavailable" });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const address = boundedString(body.address, 42);
+    const chainId = body.chainId;
+    if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address) || typeof chainId !== "number" || !Number.isSafeInteger(chainId) || chainId < 1) {
+      return reply.code(400).send({ error: "address and chainId are required" });
+    }
+    const message = await issueWalletChallenge(options.walletProof, { accountId: request.params.accountId, address, chainId });
+    return reply.code(201).send({ message });
+  });
+
+  app.post<{ Params: { accountId: string }; Body: unknown }>("/accounts/:accountId/wallet-connection", async (request, reply) => {
+    const session = await requireSession(request, options.sessionStore);
+    if (!session) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+    if (!isOwner(options.accountOwners, request.params.accountId, session.address)) {
+      return reply.code(403).send({ error: "cross_account_access_denied" });
+    }
+    if (!options.walletProof) {
+      return reply.code(503).send({ error: "wallets_unavailable" });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const message = boundedString(body.message, 2048);
+    const signature = boundedString(body.signature, 8192);
+    const label = body.label === undefined ? undefined : boundedString(body.label, 40);
+    if (!message || !signature || (body.label !== undefined && !label)) {
+      return reply.code(400).send({ error: "message and signature are required" });
+    }
+    const proof = await verifyWalletProof(options.walletProof, { accountId: request.params.accountId, message, signature });
+    if (!proof.ok) {
+      return reply.code(422).send({ error: "wallet_proof_failed", reason: proof.reason, detail: proof.reason });
+    }
+    try {
+      const result = await invokeWorker<BinanceConnectResult>(
+        { binaryPath: options.workerBinaryPath },
+        "connect",
+        JSON.stringify({ exchange: "wallet", accountId: request.params.accountId, address: proof.address, label }),
+      );
+      return reply.code(201).send(result);
+    } catch (error) {
+      if (error instanceof WorkerInvocationError) {
+        return reply.code(422).send({ error: "wallet_connection_failed", detail: error.message });
       }
       throw error;
     }

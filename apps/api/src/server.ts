@@ -21,7 +21,8 @@ import { buildApp, type AppOptions } from "./app.js";
 import { createPool } from "./storage/pool.js";
 import { credentialStore, useCredentialStore } from "./auth/identitySignature.js";
 import { PostgresCredentialStore, PostgresWebAuthnCredentialStore } from "./auth/credentialStore.js";
-import { PostgresNonceStore } from "./auth/nonceStore.js";
+import { MemoryNonceStore, PostgresNonceStore, type NonceStore } from "./auth/nonceStore.js";
+import { contractVerifierFromEnv } from "./binance-connect/walletProof.js";
 import { PostgresRateLimiter, type RateLimit } from "./auth/rateLimiter.js";
 import { useVaultNonceStore } from "./auth/vault.js";
 import { MemorySessionStore, PostgresSessionStore, type SessionStore } from "./auth/sessionStore.js";
@@ -120,6 +121,7 @@ let disclosureStore: DisclosureStore = new MemoryDisclosureStore();
 let profileSettingsStore: SettingsStore = new MemorySettingsStore();
 let limiterFactory: ((name: string, max: number, windowMs: number) => RateLimit) | undefined;
 let proofRateLimiter: RateLimit | undefined;
+let walletNonces: NonceStore = new MemoryNonceStore();
 if (process.env.DATABASE_URL) {
   const pool = createPool(process.env.DATABASE_URL);
   const sessions = new PostgresSessionStore(pool);
@@ -132,6 +134,9 @@ if (process.env.DATABASE_URL) {
   // as one and a restart forgets nothing.
   const nonces = { vault: new PostgresNonceStore(pool, "vault"), registration: new PostgresNonceStore(pool, "webauthn-registration"), authentication: new PostgresNonceStore(pool, "webauthn-authentication") };
   await Promise.all([nonces.vault.ensureSchema(), nonces.registration.ensureSchema(), nonces.authentication.ensureSchema()]);
+  const wallet = new PostgresNonceStore(pool, "wallet-proof");
+  await wallet.ensureSchema();
+  walletNonces = wallet;
   useVaultNonceStore(nonces.vault);
   useWebAuthnNonceStores({ registration: nonces.registration, authentication: nonces.authentication });
   await new PostgresRateLimiter(pool, "schema", 1, 1).ensureSchema();
@@ -149,7 +154,7 @@ if (process.env.DATABASE_URL) {
 // Loaded after the credential store is chosen, since it captures that store.
 const chainLifecycle = await loadChainLifecycle();
 
-const app = buildApp({ domain, trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 0), limiterFactory, proofRateLimiter, limitMultiplier: process.env.TRAFFIC_LIMIT_MULTIPLIER ? Number(process.env.TRAFFIC_LIMIT_MULTIPLIER) : undefined, relayBudgetPerHour: process.env.RELAY_MAX_PER_HOUR ? Number(process.env.RELAY_MAX_PER_HOUR) : undefined, publicTrackStore, sessionStore, disclosureStore, secureCookies: (process.env.WEBAUTHN_ORIGIN ?? "").startsWith("https://"), corsOrigins, chainLifecycle, binanceWorkerBinaryPath, profileSettingsStore });
+const app = buildApp({ domain, trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 0), limiterFactory, proofRateLimiter, limitMultiplier: process.env.TRAFFIC_LIMIT_MULTIPLIER ? Number(process.env.TRAFFIC_LIMIT_MULTIPLIER) : undefined, relayBudgetPerHour: process.env.RELAY_MAX_PER_HOUR ? Number(process.env.RELAY_MAX_PER_HOUR) : undefined, publicTrackStore, sessionStore, disclosureStore, secureCookies: (process.env.WEBAUTHN_ORIGIN ?? "").startsWith("https://"), corsOrigins, chainLifecycle, binanceWorkerBinaryPath, profileSettingsStore, walletProof: { domain, uri: process.env.WEBAUTHN_ORIGIN ?? `http://${domain}`, nonces: walletNonces, verifyContract: contractVerifierFromEnv(process.env) } });
 
 if (chainLifecycle) {
   // Keeps the indexer's local view continuously close to the chain tip,

@@ -26,7 +26,14 @@ export default function Connections() {
           </li>
           <li>Copy the API key and the secret into Linvesther.</li>
         </ol>
-        <p>Spot accounts are supported. Updates arrive within moments.</p>
+        <p>
+          Spot accounts are supported. Updates arrive within moments. Money you
+          put in Simple Earn (flexible or locked, which is where most staking
+          sits) still counts as yours: moving it between spot and Earn changes
+          nothing, and what Earn pays is counted as performance, not as money
+          you added. Other products, such as futures, margin or the Funding
+          wallet, are not read.
+        </p>
       </section>
 
       <section>
@@ -79,6 +86,28 @@ export default function Connections() {
           Kraken ledger, and staking rewards count as performance, not as money
           you put in. Kraken keeps price history only for a limited time, so a
           very old range may not be drawn at the finest detail.
+        </p>
+      </section>
+
+      <section>
+        <h2>On-chain wallet</h2>
+        <ol>
+          <li>Choose Crypto wallet, then pick the wallet installed in your browser and the address to follow.</li>
+          <li>
+            Sign the one message it shows. It only proves the address is yours: it is
+            not a transaction, costs nothing and gives no access to your funds. Linvesther
+            never asks a wallet for anything else.
+          </li>
+        </ol>
+        <p>
+          Your address stays private: it is stored encrypted, shown only to you, and
+          never appears on your public profile, in a claim or in a proof. The public
+          curve of a wallet has at most one point a day, because a finer one could be
+          matched against the address&apos;s public history on its chain. Balances and
+          transfers are read across Ethereum, Base, Arbitrum, Optimism and Polygon
+          (BNB Chain and Avalanche can be enabled by the operator). Money you send in or out counts as a deposit or
+          withdrawal; swaps and gas count as performance. A token with no price makes
+          the metrics unavailable instead of quietly dropping it.
         </p>
       </section>
 

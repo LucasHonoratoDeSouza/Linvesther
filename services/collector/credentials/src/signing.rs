@@ -31,6 +31,10 @@ pub const ALLOWED_PATHS: &[&str] = &[
     "/sapi/v1/convert/tradeFlow",
     "/sapi/v1/asset/dribblet",
     "/sapi/v1/asset/assetDividend",
+    "/sapi/v1/simple-earn/flexible/position",
+    "/sapi/v1/simple-earn/locked/position",
+    "/sapi/v1/simple-earn/flexible/history/rewardsRecord",
+    "/sapi/v1/simple-earn/locked/history/rewardsRecord",
     "/api/v3/klines",
 ];
 

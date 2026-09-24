@@ -5,6 +5,15 @@ const DAY_MS = 86_400_000;
 /** One account's value and return index over time. */
 type AccountSeries = Pick<BinanceSeries, "points" | "sinceMs">;
 
+/** At most one point per UTC day (the day's last). A wallet's history is public on its chain,
+ * so a fine-grained public curve could be matched against it to find the address; a daily
+ * one cannot. */
+export function atMostDaily<T extends Pick<BinanceSeries, "points" | "stepMs">>(series: T): T {
+  const lastOfDay = new Map<number, T["points"][number]>();
+  for (const point of series.points) lastOfDay.set(Math.floor(point.timeMs / DAY_MS), point);
+  return { ...series, points: [...lastOfDay.values()], stepMs: Math.max(series.stepMs, DAY_MS) };
+}
+
 /** Several accounts' return curves as one: over each interval, each
  * account counts in proportion to what it held at the start of it. An
  * account only starts counting from when it was connected. Absolute values

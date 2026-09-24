@@ -375,6 +375,7 @@ dependencies = [
  "collector-credentials",
  "exchange-core",
  "reqwest",
+ "rust_decimal",
  "serde",
  "serde_json",
  "thiserror",
@@ -433,6 +434,7 @@ dependencies = [
  "tokio-tungstenite",
  "uuid",
  "valuation",
+ "wallet-client",
  "zeroize",
  "zkvm-methods",
 ]

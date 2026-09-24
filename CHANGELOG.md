@@ -6,6 +6,33 @@ All notable changes are recorded here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Binance: money in Simple Earn (flexible and locked, where most staking sits) now
+  counts toward the account's value, and what Earn pays is read as performance.
+  Before, moving funds from spot into Earn removed them from the account without a
+  deposit, withdrawal or trade, so the return showed a loss that had not happened,
+  and rewards were never read. Positions and rewards are read with the key's
+  existing read permission. The old `LD`-prefixed flexible-Earn tokens in spot are
+  not counted twice. Only what Simple Earn covers is read: futures, margin, the
+  Funding wallet and other staking products are not. Checked against the answer
+  formats in Binance's documentation and through the engine with a synthetic
+  market; not yet against a real account.
+- On-chain wallets as a fifth kind of read-only connection, across Ethereum,
+  Base, Arbitrum, Optimism and Polygon (BNB Chain and Avalanche can be enabled). A person chooses a
+  browser wallet (EIP-6963) and signs one Sign-In with Ethereum message that is
+  bound to the host, the account, the network and a single-use nonce; it is
+  not a transaction and the page asks a wallet for nothing else. Smart-contract
+  wallets are checked (ERC-1271) on the node configured for their network.
+  Balances are read from a node at a block final on that network and reconciled
+  with the transfers a block explorer lists; what remains unexplained becomes a
+  deposit or withdrawal, and a network the explorer does not cover is refused
+  rather than shown partly. The address is stored encrypted, shown only to its
+  owner and never appears on a public route, in a claim or in a log, and a
+  wallet's public curve has at most one point a day. Operators set
+  `ETHERSCAN_API_KEY` or `BLOCKSCOUT_API_KEY` (and optionally `WALLET_CHAINS`,
+  `WALLET_RPC_URL_<chainId>`); not yet tried against a real wallet.
+
 ### Changed
 
 - Images now stay cached for a year instead of 60 seconds after the site's
