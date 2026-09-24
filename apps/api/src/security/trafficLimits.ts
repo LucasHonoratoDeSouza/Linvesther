@@ -1,5 +1,7 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { RateLimiter, type RateLimit } from "../auth/rateLimiter.js";
+import { readOnlyTrafficKey } from "../auth/requireReadOnlyToken.js";
+import { READ_ONLY_PREFIX } from "../readonly/routes.js";
 
 /** One kind of traffic and how much of it one client may send. */
 interface Policy {
@@ -7,6 +9,10 @@ interface Policy {
   matches: (method: string, path: string) => boolean;
   max: number;
   windowMs: number;
+  /** What counts as one client for this policy. The network address by
+   * default; a policy whose callers each hold their own credential
+   * counts per credential instead. */
+  clientKey?: (request: FastifyRequest) => string;
 }
 
 const CONNECT = /^\/accounts\/[^/]+\/(binance|coinbase|kraken|ibkr|wallet)-connection$|^\/accounts\/[^/]+\/wallet-challenge$/;
@@ -44,6 +50,24 @@ export const DEFAULT_POLICIES: Policy[] = [
     name: "public",
     matches: (_m, p) => p.startsWith("/public/"),
     max: 120,
+    windowMs: 60_000,
+  },
+  // An agent reading an account through its own token. Tighter than a
+  // browser's reads, because an agent polls and a person does not, and
+  // counted per token so one agent cannot spend another's allowance —
+  // nor the browser's, which shares the identity but not the credential.
+  {
+    name: "read-only-api",
+    matches: (_m, p) => p === READ_ONLY_PREFIX || p.startsWith(`${READ_ONLY_PREFIX}/`),
+    max: 60,
+    windowMs: 60_000,
+    clientKey: readOnlyTrafficKey,
+  },
+  // Handing out a credential. A person does this a few times ever.
+  {
+    name: "api-tokens",
+    matches: (m, p) => m !== "GET" && (p === "/api-tokens" || p.startsWith("/api-tokens/")),
+    max: 20,
     windowMs: 60_000,
   },
   { name: "other", matches: () => true, max: 600, windowMs: 60_000 },
@@ -95,9 +119,10 @@ export function registerTrafficLimits(
     // Counted only for requests the per-client limit lets through.
     const spendsGas = request.method !== "GET" && RELAY.test(path);
     if (!match) return;
+    const client = match.policy.clientKey?.(request) ?? request.ip;
     if (
       !(await match.limiter.allow(
-        `${match.policy.name}:${request.ip}`,
+        `${match.policy.name}:${client}`,
         options.now().getTime(),
       ))
     ) {

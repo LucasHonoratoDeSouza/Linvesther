@@ -14,10 +14,12 @@
   "dependencies": {
     "@linvestherzk/api": "workspace:*",
     "@linvestherzk/chain-worker": "workspace:*",
+    "@linvestherzk/mcp-server": "workspace:*",
     "pg": "8.23.0",
     "viem": "2.56.6"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@playwright/test": "1.63.0",
     "@simplewebauthn/server": "14.0.2",
     "@types/node": "26.6.0",

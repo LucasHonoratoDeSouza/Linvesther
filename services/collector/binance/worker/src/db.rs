@@ -162,6 +162,13 @@ pub async fn upsert_flows(
     Ok(())
 }
 
+/// The markets this connection has already traded on, so they keep being read even once
+/// nothing of them is held any more.
+pub async fn traded_symbols(pool: &PgPool, connection_id: Uuid) -> Result<Vec<String>, sqlx::Error> {
+    let rows: Vec<(String,)> = sqlx::query_as("SELECT DISTINCT symbol FROM binance_synced_trades WHERE connection_id = $1").bind(connection_id).fetch_all(pool).await?;
+    Ok(rows.into_iter().map(|(symbol,)| symbol).collect())
+}
+
 /// When the latest Simple Earn reward already stored was paid, if any — where the next
 /// read of the rewards picks up.
 pub async fn latest_earn_reward_ms(pool: &PgPool, connection_id: Uuid) -> Result<Option<u64>, sqlx::Error> {

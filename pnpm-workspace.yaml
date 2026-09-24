@@ -5,6 +5,7 @@ packages:
   - "apps/*"
   - "packages/*"
   - "services/chain-worker"
+  - "services/mcp-server"
   - "tests/e2e"
 allowBuilds:
   esbuild: true

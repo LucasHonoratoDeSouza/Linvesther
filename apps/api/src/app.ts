@@ -23,6 +23,12 @@ import {
   SESSION_TTL_MS,
   type SessionStore,
 } from "./auth/sessionStore.js";
+import {
+  MemoryReadOnlyTokenStore,
+  type ReadOnlyTokenStore,
+} from "./auth/readOnlyTokenStore.js";
+import { registerApiTokenRoutes } from "./api-tokens/routes.js";
+import { registerReadOnlyRoutes } from "./readonly/routes.js";
 import { credentialStore } from "./auth/identitySignature.js";
 import {
   beginChallenge,
@@ -62,6 +68,9 @@ export interface AppOptions {
    * relies on cookie-based sessions. */
   corsOrigins?: string[];
   sessionStore?: SessionStore;
+  /** Where the read-only API tokens behind `/mcp/*` live (in memory
+   * unless a durable store is given). */
+  readOnlyTokenStore?: ReadOnlyTokenStore;
   /** Caps how often one session can start a real proof (CPU/RAM-heavy). */
   proofRateLimiter?: RateLimit;
   /** Where a claim is checked against the owner's current figures. Defaults to the combined record read from the connected accounts. */
@@ -152,6 +161,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
   const binanceWorkerBinaryPath =
     options.binanceWorkerBinaryPath ?? "services/target/debug/binance-worker";
   const now = options.now ?? (() => new Date());
+  const readOnlyTokenStore =
+    options.readOnlyTokenStore ?? new MemoryReadOnlyTokenStore(now);
 
   const app = Fastify({
     bodyLimit: options.bodyLimitBytes ?? 1024 * 1024,
@@ -239,6 +250,17 @@ export function buildApp(options: AppOptions): FastifyInstance {
     settings: profileSettings,
     chain: options.chainLifecycle,
     publicProfiles,
+  });
+  // The read-only account API and the tokens that reach it. Registered
+  // after the connection routes and entirely apart from them: nothing
+  // here can change any state a person holds, and the tokens it accepts
+  // reach no other route in this app.
+  registerApiTokenRoutes(app, { sessionStore, tokenStore: readOnlyTokenStore, now });
+  registerReadOnlyRoutes(app, {
+    tokenStore: readOnlyTokenStore,
+    accountOwners,
+    workerBinaryPath: binanceWorkerBinaryPath,
+    now,
   });
   registerClaimsRoutes(app, {
     sessionStore,

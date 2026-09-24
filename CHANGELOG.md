@@ -47,6 +47,13 @@ All notable changes are recorded here. The format follows
 
 ### Fixed
 
+- Binance: a purchase made after connecting was never seen, so the coin looked like
+  it had been held since the connection and its whole rise showed as profit. Binance
+  lists trades one market at a time and only the markets chosen at connection (none,
+  from the form) were read. Every sync now also reads the markets of each asset the
+  account holds, in spot or Earn, against the usual quote currencies, and keeps
+  reading the ones already traded on.
+
 - Creating an identity failed with `internal_error` right after the API had been
   restarted. The indexer resumes at the highest block it stored and read that
   block's events again, and inserting an identity, track or account twice was an

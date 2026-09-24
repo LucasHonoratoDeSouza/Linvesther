@@ -136,6 +136,32 @@ export interface BinancePerformance {
   };
 }
 
+/** One execution already collected for a connected account. Decimal
+ * figures are strings, never numbers — the same precision rule the
+ * worker follows. */
+export interface ExecutedTrade {
+  symbol: string;
+  tradeId: number;
+  orderId: number;
+  price: string;
+  quantity: string;
+  commission: string;
+  commissionAsset: string;
+  timeMs: number;
+  /** Which side the account was on. */
+  side: "buy" | "sell";
+}
+
+/** One page of executions — see `services/collector/binance/worker`'s
+ * `trade_log.rs` for the order key the cursor carries. */
+export interface ExecutedTradePage {
+  trades: ExecutedTrade[];
+  /** Pass back as `cursor` to continue; `null` on the last page. */
+  nextCursor: string | null;
+  /** When the account was connected. */
+  sinceMs: number;
+}
+
 export const SERIES_RANGES = ["24h", "7d", "30d", "1y", "5y", "max"] as const;
 export type SeriesRange = (typeof SERIES_RANGES)[number];
 
