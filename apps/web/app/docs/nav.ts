@@ -7,6 +7,7 @@ export const DOC_PAGES = [
   { href: "/docs/security", label: "Security and limits", group: "Concepts" },
   { href: "/docs/verify", label: "Verify a proof", group: "Reference" },
   { href: "/docs/api", label: "Public API", group: "Reference" },
+  { href: "/docs/mcp", label: "MCP server", group: "Reference" },
   { href: "/docs/contracts", label: "Contracts", group: "Reference" },
   { href: "/docs/self-hosting", label: "Run it yourself", group: "Reference" },
   { href: "/docs/faq", label: "FAQ and glossary", group: "Reference" },
