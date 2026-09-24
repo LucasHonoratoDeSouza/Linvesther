@@ -7,7 +7,9 @@
     "noUncheckedIndexedAccess": true,
     "types": ["node"],
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "declaration": true,
+    "outDir": "dist"
   },
-  "include": ["auth", "lifecycle", "claims", "public", "eras", "multi-account", "binance-connect", "mcp", "web", "playwright.config.ts"]
+  "include": ["src", "test"]
 }

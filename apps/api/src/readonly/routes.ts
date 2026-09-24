@@ -172,10 +172,26 @@ export function registerReadOnlyRoutes(app: FastifyInstance, options: ReadOnlyRo
     let balanceUnavailable: string | null = connected.length === 0 ? "no account is connected" : null;
     for (const account of connected) {
       const payload = JSON.stringify({ accountId: account.accountId });
-      let connection: BinanceConnectionStatus | null = null;
+      let connection: {
+        connected: boolean;
+        status: string | null;
+        lastSyncedAt: string | null;
+        tradeCount: number;
+        flowCount: number;
+      } | null = null;
       let connectionUnavailable: string | null = null;
       try {
-        connection = await invokeWorker<BinanceConnectionStatus>(worker, "status", payload);
+        // The worker answers in the shape its own `ConnectionSummary`
+        // serializes to; this API names its fields the way the rest of
+        // its answers do.
+        const status = await invokeWorker<BinanceConnectionStatus>(worker, "status", payload);
+        connection = {
+          connected: status.connected,
+          status: status.status,
+          lastSyncedAt: status.last_synced_at,
+          tradeCount: status.trade_count,
+          flowCount: status.flow_count,
+        };
       } catch (error) {
         if (!(error instanceof WorkerInvocationError)) throw error;
         connectionUnavailable = error.message;
@@ -193,7 +209,19 @@ export function registerReadOnlyRoutes(app: FastifyInstance, options: ReadOnlyRo
         // with the reason instead of coming back smaller.
         balanceUnavailable ??= `${account.accountId}: ${error.message}`;
       }
-      accounts.push({ ...account, connection, connectionUnavailable, balance });
+      // Named field by field rather than spread: the worker's answer
+      // carries its own envelope (`ok`), and an agent's schema would
+      // then have to allow a field that means nothing to it.
+      accounts.push({
+        accountId: account.accountId,
+        broker: account.broker,
+        label: account.label,
+        connectedAtMs: account.connectedAtMs,
+        status: account.status,
+        connection,
+        connectionUnavailable,
+        balance,
+      });
     }
 
     if (balanceUnavailable === null && currencies.size > 1) {
@@ -238,7 +266,13 @@ export function registerReadOnlyRoutes(app: FastifyInstance, options: ReadOnlyRo
     if (!found) return reply;
     try {
       const nav = await invokeWorker<BinanceNav>(worker, "nav", JSON.stringify({ accountId: found.accountId }));
-      return { accountId: found.accountId, ...nav };
+      return {
+        accountId: found.accountId,
+        nav: nav.nav,
+        currency: nav.currency,
+        assets: nav.assets,
+        excludedOutOfScopeAssets: nav.excludedOutOfScopeAssets,
+      };
     } catch (error) {
       return workerFailure(reply, error, "nav_unavailable");
     }
@@ -292,7 +326,7 @@ export function registerReadOnlyRoutes(app: FastifyInstance, options: ReadOnlyRo
         "trades",
         JSON.stringify({ accountId: found.accountId, symbol, sinceMs: since, untilMs: until, cursor, limit }),
       );
-      return { accountId: found.accountId, ...page };
+      return { accountId: found.accountId, trades: page.trades, nextCursor: page.nextCursor, sinceMs: page.sinceMs };
     } catch (error) {
       return workerFailure(reply, error, "trades_unavailable");
     }
@@ -310,7 +344,7 @@ export function registerReadOnlyRoutes(app: FastifyInstance, options: ReadOnlyRo
         "series",
         JSON.stringify({ accountId: found.accountId, range: range as SeriesRange }),
       );
-      return { accountId: found.accountId, range, ...series };
+      return { accountId: found.accountId, range, points: series.points, stepMs: series.stepMs, sinceMs: series.sinceMs };
     } catch (error) {
       return workerFailure(reply, error, "series_unavailable");
     }

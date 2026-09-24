@@ -13,9 +13,13 @@ import { sumDecimals } from "../src/readonly/totals.js";
 // The read-only API is driven through the real Fastify app against a
 // small fake "worker binary" — the same stdin-JSON-in, stdout-JSON-out
 // contract the Rust binary implements — so this suite runs fast and
-// needs neither a Rust build nor a live Postgres. Every fake answer
-// echoes the request it was given, which is how a test can tell *which*
-// account was actually read.
+// needs neither a Rust build nor a live Postgres.
+//
+// The fake records every call it receives, which is how a test can tell
+// *which* account was actually read and that no route ever asks for
+// something that writes. Its answers also carry a field no route should
+// pass on (`echoed`), so a route that blindly forwarded the worker's
+// whole answer would be caught.
 
 const ME = "0x1111111111111111111111111111111111111111" as const;
 const SOMEONE_ELSE = "0x2222222222222222222222222222222222222222" as const;
@@ -66,7 +70,7 @@ function fakeWorker(options: { accounts?: unknown[]; nav?: Record<string, string
 import { appendFileSync, readFileSync } from "node:fs";
 const subcommand = process.argv[2];
 const input = JSON.parse(readFileSync(0, "utf8") || "{}");
-appendFileSync(${JSON.stringify(log)}, subcommand + "\\n");
+appendFileSync(${JSON.stringify(log)}, JSON.stringify({ subcommand, input }) + "\\n");
 const accounts = ${JSON.stringify(accounts)};
 const navByAccount = ${JSON.stringify(options.nav ?? {})};
 const answer = (body) => { console.log(JSON.stringify({ ok: true, echoed: { subcommand, input }, ...body })); };
@@ -93,7 +97,12 @@ switch (subcommand) {
   );
   chmodSync(path, 0o755);
   writeFileSync(log, "");
-  return { path, calls: () => readFileSync(log, "utf8").split("\n").filter(Boolean) };
+  const calls = () =>
+    readFileSync(log, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { subcommand: string; input: Record<string, unknown> });
+  return { path, calls, subcommands: () => calls().map((call) => call.subcommand) };
 }
 
 async function appWithToken(workerOptions: Parameters<typeof fakeWorker>[0] = {}, appOverrides: Partial<Parameters<typeof buildApp>[0]> = {}) {
@@ -134,7 +143,15 @@ describe("reading an account with a read-only token", () => {
     expect(state.json()).toMatchObject({
       address: ME,
       scope: "read:account",
-      accounts: [{ accountId: ME, broker: "binance", connection: { trade_count: 7 }, balance: { nav: "1234.50", currency: "USDT" } }],
+      accounts: [
+        {
+          accountId: ME,
+          broker: "binance",
+          connection: { connected: true, status: "active", lastSyncedAt: "2026-09-01T00:00:00Z", tradeCount: 7, flowCount: 2 },
+          connectionUnavailable: null,
+          balance: { nav: "1234.50", currency: "USDT" },
+        },
+      ],
       balance: { total: "1234.50", currency: "USDT" },
       balanceUnavailable: null,
     });
@@ -165,15 +182,28 @@ describe("reading an account with a read-only token", () => {
   });
 
   it("reads the token owner's own account when none is named", async () => {
-    const { app, token } = await appWithToken();
-    const body = (await app.inject({ method: "GET", url: "/mcp/account/nav", headers: auth(token) })).json();
-    expect(body.echoed.input.accountId).toBe(ME);
+    const { app, token, worker } = await appWithToken();
+    await app.inject({ method: "GET", url: "/mcp/account/nav", headers: auth(token) });
+    expect(worker.calls()[0]?.input.accountId).toBe(ME);
   });
 
   it("reads a further account of the same identity when named", async () => {
+    const { app, token, worker } = await appWithToken();
+    await app.inject({ method: "GET", url: `/mcp/account/nav?accountId=${ME}_swing`, headers: auth(token) });
+    expect(worker.calls()[0]?.input.accountId).toBe(`${ME}_swing`);
+  });
+
+  // The worker prints its own `{"ok": true, ...}` envelope. Passing that
+  // through would put a field in the contract that means nothing to a
+  // caller, and an agent validating against a published schema would
+  // reject the answer.
+  it("answers with its own fields only, never the worker's envelope", async () => {
     const { app, token } = await appWithToken();
-    const body = (await app.inject({ method: "GET", url: `/mcp/account/nav?accountId=${ME}_swing`, headers: auth(token) })).json();
-    expect(body.echoed.input.accountId).toBe(`${ME}_swing`);
+    for (const route of ROUTES) {
+      const body = (await app.inject({ method: "GET", url: route, headers: auth(token) })).json();
+      expect(Object.keys(body), route).not.toContain("ok");
+      expect(Object.keys(body), route).not.toContain("echoed");
+    }
   });
 
   it("reports the whole balance exactly, adding decimals without rounding", async () => {
@@ -323,7 +353,7 @@ describe("a read-only token changes nothing", () => {
     for (const route of ROUTES) {
       expect((await app.inject({ method: "GET", url: route, headers: auth(token) })).statusCode, route).toBe(200);
     }
-    const asked = new Set(worker.calls());
+    const asked = new Set(worker.subcommands());
     expect([...asked].sort()).toEqual(["list", "nav", "performance", "series", "status", "trades"]);
     for (const forbidden of ["connect", "disconnect", "rename", "sync", "prove-performance", "rekey"]) {
       expect(asked.has(forbidden), forbidden).toBe(false);
@@ -359,9 +389,9 @@ describe("what a read-only route refuses to look up", () => {
   });
 
   it("passes the filters it accepts straight through to the worker", async () => {
-    const { app, token } = await appWithToken();
-    const body = (await app.inject({ method: "GET", url: "/mcp/account/trades?symbol=BTCUSDT&since=1000&until=2000&limit=50&cursor=1000:1:BTCUSDT", headers: auth(token) })).json();
-    expect(body.echoed.input).toMatchObject({ symbol: "BTCUSDT", sinceMs: 1000, untilMs: 2000, limit: 50, cursor: "1000:1:BTCUSDT" });
+    const { app, token, worker } = await appWithToken();
+    await app.inject({ method: "GET", url: "/mcp/account/trades?symbol=BTCUSDT&since=1000&until=2000&limit=50&cursor=1000:1:BTCUSDT", headers: auth(token) });
+    expect(worker.calls()[0]?.input).toMatchObject({ symbol: "BTCUSDT", sinceMs: 1000, untilMs: 2000, limit: 50, cursor: "1000:1:BTCUSDT" });
   });
 
   it("reports a worker failure as a failure, with the worker's own reason", async () => {
