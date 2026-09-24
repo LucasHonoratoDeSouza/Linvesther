@@ -15,13 +15,15 @@ previous_worker="$(readlink "$ROOT/current-worker" 2>/dev/null || true)"
 
 healthy() {
   for _ in $(seq 1 30); do
-    if curl -fsS -o /dev/null http://127.0.0.1:4301/healthz && curl -fsS -o /dev/null http://127.0.0.1:4300/; then return 0; fi
+    if curl -fsS -o /dev/null http://127.0.0.1:4301/healthz \
+      && curl -fsS -o /dev/null http://127.0.0.1:4300/ \
+      && curl -fsS -o /dev/null http://127.0.0.1:4302/healthz; then return 0; fi
     sleep 2
   done
   return 1
 }
 
-restart() { systemctl --user restart linvesther-api.service linvesther-web.service; }
+restart() { systemctl --user restart linvesther-api.service linvesther-web.service linvesther-mcp.service; }
 
 rollback() {
   echo "deploy of $target failed; going back to ${previous:-nothing}" >&2
