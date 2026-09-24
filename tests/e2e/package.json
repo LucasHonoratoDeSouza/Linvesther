@@ -16,15 +16,15 @@
     "@linvestherzk/chain-worker": "workspace:*",
     "@linvestherzk/mcp-server": "workspace:*",
     "pg": "8.23.0",
-    "viem": "2.56.6"
+    "viem": "2.56.8"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
     "@playwright/test": "1.63.0",
     "@simplewebauthn/server": "14.0.2",
-    "@types/node": "26.6.0",
+    "@types/node": "26.6.2",
     "@types/pg": "8.23.1",
-    "tsx": "^4.23.13",
+    "tsx": "^4.23.15",
     "typescript": "7.0.2",
     "vitest": "5.0.1"
   }

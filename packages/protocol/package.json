@@ -11,12 +11,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "canonicalize": "5.0.0",
+    "canonicalize": "5.1.0",
     "jsonc-parser": "3.3.1"
   },
   "devDependencies": {
     "typescript": "7.0.2",
     "vitest": "5.0.1",
-    "@types/node": "26.6.0"
+    "@types/node": "26.6.2"
   }
 }
