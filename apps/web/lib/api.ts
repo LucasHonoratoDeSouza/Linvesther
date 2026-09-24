@@ -340,6 +340,41 @@ export function fetchBinancePerformanceProof(accountId: string): Promise<ApiResu
   return call(`/accounts/${accountId}/binance-performance-proof`);
 }
 
+/** A read-only API token this identity has handed out. Never carries the
+ * token itself — only `createApiToken`'s reply does, once. */
+export interface ApiToken {
+  id: string;
+  address: `0x${string}`;
+  label: string;
+  /** What the token may do. `read:account` and nothing else, for now. */
+  scope: string;
+  createdAt: string;
+  /** When it last read something; `null` while it never has. */
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  expiresAt: string | null;
+}
+
+export function fetchApiTokens(): Promise<ApiResult<{ tokens: ApiToken[]; maxActive: number }>> {
+  return call("/api-tokens");
+}
+
+/** Creates a token and returns it in the clear — the only time it exists
+ * outside the agent that will hold it. Nothing stores it, so it cannot be
+ * shown again. */
+export function createApiToken(label: string): Promise<ApiResult<{ token: string; record: ApiToken }>> {
+  return call("/api-tokens", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ label }),
+  });
+}
+
+/** Stops the token immediately and for good. */
+export function revokeApiToken(id: string): Promise<ApiResult<{ revoked: true }>> {
+  return call(`/api-tokens/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export type ShareableMetric = "return" | "maxDrawdown" | "sharpe" | "winRate";
 
 /** The owner's one privacy choice: in full privacy mode the public address shows nothing. */
