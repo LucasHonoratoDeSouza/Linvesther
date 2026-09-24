@@ -8,6 +8,16 @@ All notable changes are recorded here. The format follows
 
 ### Added
 
+- Binance: money in Simple Earn (flexible and locked, where most staking sits) now
+  counts toward the account's value, and what Earn pays is read as performance.
+  Before, moving funds from spot into Earn removed them from the account without a
+  deposit, withdrawal or trade, so the return showed a loss that had not happened,
+  and rewards were never read. Positions and rewards are read with the key's
+  existing read permission. The old `LD`-prefixed flexible-Earn tokens in spot are
+  not counted twice. Only what Simple Earn covers is read: futures, margin, the
+  Funding wallet and other staking products are not. Checked against the answer
+  formats in Binance's documentation and through the engine with a synthetic
+  market; not yet against a real account.
 - On-chain wallets as a fifth kind of read-only connection, across Ethereum,
   Base, Arbitrum, Optimism and Polygon (BNB Chain and Avalanche can be enabled). A person chooses a
   browser wallet (EIP-6963) and signs one Sign-In with Ethereum message that is

@@ -26,7 +26,14 @@ export default function Connections() {
           </li>
           <li>Copy the API key and the secret into Linvesther.</li>
         </ol>
-        <p>Spot accounts are supported. Updates arrive within moments.</p>
+        <p>
+          Spot accounts are supported. Updates arrive within moments. Money you
+          put in Simple Earn (flexible or locked, which is where most staking
+          sits) still counts as yours: moving it between spot and Earn changes
+          nothing, and what Earn pays is counted as performance, not as money
+          you added. Other products, such as futures, margin or the Funding
+          wallet, are not read.
+        </p>
       </section>
 
       <section>
