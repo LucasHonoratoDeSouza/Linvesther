@@ -22,6 +22,9 @@ binance-worker nav        # reads {"accountId"} JSON from stdin, computes and pr
                            # current NAV snapshot from the account's real balance and real prices
 binance-worker performance # reads {"accountId"} JSON from stdin, prints real daily NAV/returns
                            # plus Sharpe/Sortino/MDD/CAGR/win-rate (see history.rs, below)
+binance-worker trades     # reads {"accountId","symbol"?,"sinceMs"?,"untilMs"?,"cursor"?,"limit"?}
+                           # JSON from stdin, prints one page of the executions already collected
+                           # (see trade_log.rs, below) — stored data only, no exchange call
 binance-worker prove-performance # reads {"accountId"} JSON from stdin, runs REAL RISC Zero
                            # proving (CPU/RAM-heavy — see "Real ZK performance proof", below)
                            # and prints a portable, independently-verifiable proof
@@ -186,6 +189,27 @@ be the next step for very long histories.
 crate's own doc comment) is wired into `history.rs` (`compute_overall_
 win_rate`) and exposed by `performance`/`binance-performance`.
 
+## The executions already collected (`trade_log.rs`)
+
+`trades` hands back the executions this worker has already persisted —
+narrowed to one market or one period, a bounded page at a time. It reads
+stored rows only: it opens no exchange connection, decrypts no
+credential, and computes nothing, so it is the cheapest read here and
+the only one that cannot fail on a market call.
+
+Trades are ordered by `(time_ms, symbol, id)`, never `time_ms` alone:
+`(symbol, id)` is the namespace of an execution, so two unrelated trades
+can share both a millisecond and a numeric id, and a page boundary drawn
+on the incomplete key would drop or repeat them. A page's `nextCursor`
+carries that whole key, and is handed out only when a further page
+actually exists.
+
+Every exchange answers through the same code: Binance's
+`binance_synced_trades`, Coinbase's fills and Kraken's trades are all
+loaded as `Trade` first. An on-chain wallet and an IBKR Flex statement
+carry no executions of their own, so they answer with an empty page —
+the true answer for them, not a missing one.
+
 ## Real ZK performance proof (`prove.rs`)
 
 `prove-performance` proves a real claim about this account's real
@@ -315,6 +339,11 @@ out of scope). See `apps/api/src/binance-connect`'s README and
   format, `executionReport` field extraction, a null commission asset
   represented honestly as empty rather than fabricated. Pure, part of
   the default gate.
+- `tests/trade_log_test.rs` — the order key, the symbol and period
+  filters, walking every trade exactly once across pages, the same
+  numeric id on two markets kept apart at a page boundary, no cursor
+  handed out for a page that is already the last, and a refused cursor
+  or page size. Pure, no database, part of the default gate.
 - `tests/db_test.rs` — real Postgres integration: connect/find
   round-trips, reconnecting the same account upserts rather than
   duplicates, trade/flow dedup, the `(symbol, id)` namespace rule,

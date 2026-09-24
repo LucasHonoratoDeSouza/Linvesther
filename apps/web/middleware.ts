@@ -18,6 +18,7 @@ const APP_PREFIXES = [
   "/claims",
   "/c",
   "/onboarding",
+  "/settings",
   "/p",
   "/profile",
 ];

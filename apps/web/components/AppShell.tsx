@@ -18,6 +18,7 @@ const navigation: { href: string; label: string }[] = [
 // competing for attention at the same level.
 const accountNavigation: { href: string; label: string }[] = [
   { href: "/onboarding", label: "Your identity" },
+  { href: "/settings/api-tokens", label: "API tokens" },
 ];
 
 const allNavigation = [...navigation, ...accountNavigation];

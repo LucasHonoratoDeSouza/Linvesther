@@ -12,6 +12,8 @@ profiles and the account-connection routes.
 | `claims/` | Publishing and reading signed claims, and checking a claim against the owner's figures. |
 | `profile/` | Combined public profile, privacy mode and the optional on-chain name and bio. |
 | `binance-connect/` | Connecting exchange and broker accounts and reading their performance. |
+| `readonly/` | The read-only account API under `/mcp`, for an outside agent. Six GETs, a bearer token, no writes — see [its README](src/readonly/README.md). |
+| `api-tokens/` | Creating, listing and revoking the read-only tokens that reach `/mcp`. Session-only. |
 | `public/`, `exports/`, `eras/`, `multi-account/` | Track projection, portable bundles, strategy eras and consolidation. They keep their data in memory. |
 | `GET /public/collector` | The fingerprint of the key that signs this instance's figures, also carried as `origin` on profiles and claims. |
 
@@ -32,11 +34,22 @@ profiles and the account-connection routes.
   one and a restart forgets nothing; without a database they are per process, so
   run a single instance.
 
+## Read-only API tokens
+
+An identity can hand out a token that reads its own account and can do
+nothing else. It is a separate credential from the session cookie, kept
+only as a SHA-256 hash, revocable at any moment, and accepted only by the
+`/mcp` routes — `auth/requireSession.ts` reads the cookie and never a
+header, `auth/requireReadOnlyToken.ts` reads the header and never a
+cookie, so neither credential reaches the other's routes. See
+[`src/readonly/README.md`](src/readonly/README.md).
+
 ## Limits
 
 - A state-changing request from an origin the API does not serve is refused.
 - Starting a real proof is rate-limited per session.
 - Fastify's `bodyLimit` rejects an oversized payload before any route runs.
+- The read-only API is capped per token, tighter than a browser's reads.
 
 ## Claims
 

@@ -1,0 +1,90 @@
+/* Only what the portfolio's shared styles do not already cover: the one
+   showing of a token, and the list of the ones already handed out. */
+
+.tokenReveal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  margin: 4px 0 14px;
+  background: #11170e;
+  border: 1px solid #3a4a2e;
+  border-radius: 12px;
+}
+
+.tokenValue {
+  flex: 1 1 320px;
+  min-width: 0;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  color: #d0edaa;
+  overflow-wrap: anywhere;
+}
+
+.tokenRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 0;
+  border-bottom: 1px solid #2c302a;
+}
+
+.tokenRow:last-child {
+  border-bottom: 0;
+}
+
+.tokenMeta {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.tokenName {
+  font-size: 13px;
+  color: #e0e9d7;
+  overflow-wrap: anywhere;
+}
+
+.tokenRevoked {
+  color: #7a8570;
+  text-decoration: line-through;
+}
+
+.tokenDates {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #7a8570;
+}
+
+.revokeButton {
+  background: #241a19;
+  border: 1px solid #50352f;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 11px;
+  color: #ffaca6;
+  cursor: pointer;
+}
+
+.revokeButton:hover:not(:disabled) {
+  background: #2e201e;
+}
+
+.revokeButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.usage {
+  margin: 0;
+  padding: 14px 16px;
+  background: #11170e;
+  border: 1px solid #2c302a;
+  border-radius: 12px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  line-height: 1.9;
+  color: #b7c6a6;
+  overflow-x: auto;
+}

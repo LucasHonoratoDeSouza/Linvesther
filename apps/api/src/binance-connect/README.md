@@ -24,8 +24,10 @@ response.
 
 ## Ownership: `isOwner` and the self-ownership rule
 
-Every route below is owner-only, checked via `routes.ts`'s `isOwner`
-helper: an explicit `accountOwners` entry (the same map
+Every route below is owner-only, checked via `auth/accountOwnership.ts`'s
+`isOwner` helper — shared with the read-only API under `/mcp`, so there
+is one answer to "is this account theirs" whichever credential got the
+caller in: an explicit `accountOwners` entry (the same map
 the account routes use) always takes precedence when
 present, but if `accountId` has no entry at all, an address is treated
 as owning the accountId that equals its own address. This lets a

@@ -25,6 +25,25 @@ export type {
 } from "./public/types.js";
 export { RateLimiter } from "./auth/rateLimiter.js";
 export { MemorySessionStore, PostgresSessionStore, SESSION_TTL_MS, type Session, type SessionStore } from "./auth/sessionStore.js";
+export { isOwner } from "./auth/accountOwnership.js";
+export {
+  generateReadOnlyToken,
+  looksLikeReadOnlyToken,
+  MemoryReadOnlyTokenStore,
+  MAX_ACTIVE_TOKENS,
+  MAX_TOKEN_LENGTH,
+  PostgresReadOnlyTokenStore,
+  READ_ONLY_SCOPE,
+  readOnlyTokenDigest,
+  TooManyReadOnlyTokensError,
+  type ReadOnlyScope,
+  type ReadOnlyTokenRecord,
+  type ReadOnlyTokenStore,
+  type TokenRefusal,
+} from "./auth/readOnlyTokenStore.js";
+export { requireReadOnlyToken, readOnlyTrafficKey, type ReadOnlyPrincipal } from "./auth/requireReadOnlyToken.js";
+export { READ_ONLY_PREFIX, registerReadOnlyRoutes } from "./readonly/routes.js";
+export { registerApiTokenRoutes } from "./api-tokens/routes.js";
 export {
   beginConfirmIdentity,
   confirmIdentity,
@@ -55,5 +74,10 @@ export type {
   BinancePerformance,
   BinancePerformanceProof,
   BinanceDailyNav,
+  BinanceSeries,
   BinanceWinRate,
+  ConnectedAccount,
+  ExecutedTrade,
+  ExecutedTradePage,
+  SeriesRange,
 } from "./binance-connect/types.js";
