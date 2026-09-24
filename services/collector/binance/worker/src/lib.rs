@@ -20,4 +20,5 @@ pub mod rekey;
 pub mod secrets;
 pub mod stream;
 pub mod sync;
+pub mod trade_log;
 pub mod wallet;

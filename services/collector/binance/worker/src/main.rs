@@ -5,6 +5,9 @@
 //!                            # validates+stores the credential, runs one sync cycle, prints a JSON summary
 //! binance-worker status     # reads {"accountId"} JSON from stdin, prints connection status as JSON
 //! binance-worker nav        # reads {"accountId"} JSON from stdin, computes and prints a real current NAV snapshot
+//! binance-worker trades     # reads {"accountId","symbol"?,"sinceMs"?,"untilMs"?,"cursor"?,"limit"?} JSON
+//!                            # from stdin, prints one page of the executed trades already collected
+//!                            # (stored data only: no exchange call, no credential read)
 //! binance-worker performance # reads {"accountId"} JSON from stdin, prints real daily NAV/returns plus
 //!                             # Sharpe/Sortino/MDD/CAGR/win-rate (each independently null when insufficient sample)
 //! binance-worker prove-performance # reads {"accountId"} JSON from stdin, runs REAL RISC Zero proving
@@ -621,6 +624,114 @@ async fn run_series() -> Result<SeriesResponse, String> {
             })
             .collect(),
         step_ms: series.step_ms,
+        since_ms,
+    })
+}
+
+#[derive(Deserialize)]
+struct TradesRequest {
+    #[serde(rename = "accountId")]
+    account_id: String,
+    /// One market only, compared without case. Absent: every market.
+    #[serde(default)]
+    symbol: Option<String>,
+    /// Inclusive bounds on the execution time, epoch milliseconds.
+    #[serde(rename = "sinceMs", default)]
+    since_ms: Option<u64>,
+    #[serde(rename = "untilMs", default)]
+    until_ms: Option<u64>,
+    /// The `nextCursor` of the previous page.
+    #[serde(default)]
+    cursor: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct TradeJson {
+    symbol: String,
+    #[serde(rename = "tradeId")]
+    trade_id: u64,
+    #[serde(rename = "orderId")]
+    order_id: u64,
+    /// Decimal strings, never floats — the same precision rule the rest
+    /// of this worker follows.
+    price: String,
+    quantity: String,
+    commission: String,
+    #[serde(rename = "commissionAsset")]
+    commission_asset: String,
+    #[serde(rename = "timeMs")]
+    time_ms: u64,
+    /// Which side this account was on.
+    side: &'static str,
+}
+
+#[derive(Serialize)]
+struct TradesResponse {
+    trades: Vec<TradeJson>,
+    /// Pass back as `cursor` for the next page; `null` on the last one.
+    #[serde(rename = "nextCursor")]
+    next_cursor: Option<String>,
+    /// When the account was connected — no trade is collected before it,
+    /// apart from the one-time historical backfill a connection asked for.
+    #[serde(rename = "sinceMs")]
+    since_ms: u64,
+}
+
+/// The executed trades already collected for one account, filtered and
+/// paged. Reads only what is stored: it opens no exchange connection and
+/// never touches the stored credential, so it cannot place, change or
+/// cancel anything.
+async fn run_trades() -> Result<TradesResponse, String> {
+    let request: TradesRequest = read_stdin_json()?;
+    let after = match &request.cursor {
+        Some(text) => Some(
+            binance_worker::trade_log::Cursor::parse(text)
+                .ok_or_else(|| "cursor is not one this service issued".to_string())?,
+        ),
+        None => None,
+    };
+    let query = binance_worker::trade_log::TradeQuery {
+        symbol: request.symbol.clone(),
+        since_ms: request.since_ms,
+        until_ms: request.until_ms,
+        after,
+        limit: request.limit.unwrap_or(binance_worker::trade_log::DEFAULT_PAGE),
+    };
+    query.check()?;
+
+    let pool = pool().await?;
+    let account = resolve(&pool, &request.account_id).await?;
+    let since_ms = since_ms(&pool, &account).await?;
+    let stored = match &account {
+        Account::Binance(c) => db::fetch_stored_trades(&pool, c.id).await.map_err(|e| e.to_string())?,
+        Account::Coinbase(c) => coinbase::trades(&pool, c.id).await.map_err(|e| e.to_string())?,
+        Account::Kraken(c) => kraken::trades(&pool, c.id).await.map_err(|e| e.to_string())?,
+        // An on-chain wallet and an IBKR Flex statement carry no
+        // executions of their own — only flows and daily NAV. An empty
+        // list is the true answer for them, not a missing one.
+        Account::Wallet(_) | Account::Ibkr(_) => Vec::new(),
+    };
+
+    let page = binance_worker::trade_log::page(stored, &query);
+    Ok(TradesResponse {
+        trades: page
+            .trades
+            .iter()
+            .map(|t| TradeJson {
+                symbol: t.symbol.clone(),
+                trade_id: t.id,
+                order_id: t.order_id,
+                price: t.price.clone(),
+                quantity: t.qty.clone(),
+                commission: t.commission.clone(),
+                commission_asset: t.commission_asset.clone(),
+                time_ms: t.time_ms,
+                side: if t.is_buyer { "buy" } else { "sell" },
+            })
+            .collect(),
+        next_cursor: page.next.as_ref().map(|c| c.encode()),
         since_ms,
     })
 }
@@ -1264,6 +1375,7 @@ async fn main() {
         "credential-check" => print_result(run_rekey(false).await),
         "sync" => print_result(run_sync().await),
         "series" => print_result(run_series().await),
+        "trades" => print_result(run_trades().await),
         "nav" => print_result(run_nav().await),
         "performance" => print_result(run_performance().await),
         #[cfg(feature = "proving")]
@@ -1279,7 +1391,7 @@ async fn main() {
         }
         other => {
             eprintln!(
-                "unknown command '{other}'; expected connect|status|list|rename|sync|series|nav|performance|prove-performance|scheduler"
+                "unknown command '{other}'; expected connect|status|list|rename|sync|series|trades|nav|performance|prove-performance|scheduler"
             );
             std::process::exit(2);
         }
