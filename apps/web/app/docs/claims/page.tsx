@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-export const metadata = { title: "Claims" };
+export const metadata = {
+  title: "Claims",
+  description:
+    "A claim is one statement about your track record, shared as a link. It says a threshold is met and nothing about the exact figure.",
+};
 
 export default function ClaimsDocs() {
   return (

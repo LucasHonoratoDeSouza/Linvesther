@@ -1,4 +1,8 @@
-export const metadata = { title: "Contracts" };
+export const metadata = {
+  title: "Contracts",
+  description:
+    "The on-chain contracts behind Linvesther: identities, account bindings, profiles and the registries that back every claim, with their deployed addresses.",
+};
 
 const contracts = [
   [

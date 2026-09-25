@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-export const metadata = { title: "Overview" };
+export const metadata = {
+  title: "Overview",
+  description:
+    "Start here: create an identity, connect an account, publish a claim, and find the concepts, reference and guides that make up the Linvesther documentation.",
+};
 
 const tracks = [
   {

@@ -1,6 +1,10 @@
 import { CodeBlock } from "../../../components/CodeBlock";
 
-export const metadata = { title: "MCP server" };
+export const metadata = {
+  title: "MCP server",
+  description:
+    "Connect an AI agent to your own account with the Model Context Protocol: account state, positions, NAV, performance, trades and chart series.",
+};
 
 const tools = [
   ["get_account_state", "Every connected account, each connection's health, each one's current value and their total."],

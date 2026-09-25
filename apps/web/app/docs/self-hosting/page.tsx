@@ -1,6 +1,10 @@
 import { CodeBlock } from "../../../components/CodeBlock";
 
-export const metadata = { title: "Run it yourself" };
+export const metadata = {
+  title: "Run it yourself",
+  description:
+    "How to self-host Linvesther: what gets persisted, for how long, and what happens to it when a session ends or a server restarts.",
+};
 
 const persisted = [
   [

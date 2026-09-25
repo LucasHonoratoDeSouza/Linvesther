@@ -1,6 +1,9 @@
 import Link from "next/link";
 
-export const metadata = { title: "Getting started" };
+export const metadata = {
+  title: "Getting started",
+  description: "From nothing to a shareable claim in about five minutes.",
+};
 
 export default function GettingStarted() {
   return (

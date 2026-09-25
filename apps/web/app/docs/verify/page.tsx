@@ -1,6 +1,10 @@
 import { CodeBlock } from "../../../components/CodeBlock";
 
-export const metadata = { title: "Verify a proof" };
+export const metadata = {
+  title: "Verify a proof",
+  description:
+    "Check a proof yourself, offline, without trusting Linvesther or anyone else's server.",
+};
 
 export default function VerifyDocs() {
   return (

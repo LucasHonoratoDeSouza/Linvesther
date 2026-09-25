@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-export const metadata = { title: "How it works" };
+export const metadata = {
+  title: "How it works",
+  description:
+    "How performance is measured, what a claim is and what each guarantee — return, max drawdown, Sharpe ratio and more — actually means.",
+};
 
 const metrics = [
   [

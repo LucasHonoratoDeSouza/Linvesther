@@ -1,4 +1,7 @@
-export const metadata = { title: "Security and limits" };
+export const metadata = {
+  title: "Security and limits",
+  description: "What protects you, and what the system does not claim to do.",
+};
 
 export default function Security() {
   return (
