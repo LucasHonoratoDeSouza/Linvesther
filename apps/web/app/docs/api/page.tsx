@@ -161,6 +161,30 @@ export default function ApiDocs() {
         </p>
       </section>
 
+      <section id="account">
+        <h2>Read your own account</h2>
+        <p>
+          These are not part of the public API above: each one needs a
+          read-only token for the account it reads, created at{" "}
+          <code>/settings/api-tokens</code>, and answers with your own
+          balances, positions and trades rather than another address&apos;s
+          public figures.
+        </p>
+        <CodeBlock
+          label="GET /mcp/account/nav"
+          code={'curl -H "Authorization: Bearer $TOKEN" "$API_URL/mcp/account/nav"'}
+        />
+        <p>
+          The six routes are <code>/mcp/account/state</code>,{" "}
+          <code>portfolio</code>, <code>nav</code>, <code>performance</code>,{" "}
+          <code>trades</code> and <code>series</code>, one read-only route per
+          figure the account pages show you. They are also reachable as MCP
+          tools, for an AI agent to call directly — see{" "}
+          <a href="/docs/mcp">MCP server</a> for the token format, the tool
+          list and the guarantees that keep them read-only.
+        </p>
+      </section>
+
       <section id="cors">
         <h2>Notes</h2>
         <ul>
