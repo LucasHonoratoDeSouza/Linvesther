@@ -1,4 +1,8 @@
-export const metadata = { title: "Connect an account" };
+export const metadata = {
+  title: "Connect an account",
+  description:
+    "Every connection is read-only. Linvesther reads your history to compute percentages; it cannot trade, withdraw or move anything.",
+};
 
 export default function Connections() {
   return (

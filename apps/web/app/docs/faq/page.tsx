@@ -1,4 +1,8 @@
-export const metadata = { title: "FAQ and glossary" };
+export const metadata = {
+  title: "FAQ and glossary",
+  description:
+    "Answers on lost keys, read-only connections, privacy mode, unavailable metrics and the terms used throughout the Linvesther documentation.",
+};
 
 const faq = [
   [

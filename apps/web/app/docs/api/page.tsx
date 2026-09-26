@@ -1,6 +1,10 @@
 import { CodeBlock } from "../../../components/CodeBlock";
 
-export const metadata = { title: "Public API" };
+export const metadata = {
+  title: "Public API",
+  description:
+    "Read public profiles and claims over HTTP. No account or key is needed, and responses never contain a balance, position, trade or credential.",
+};
 
 export default function ApiDocs() {
   return (
