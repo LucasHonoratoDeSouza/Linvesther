@@ -17,12 +17,12 @@
   },
   "dependencies": {
     "pg": "8.23.0",
-    "viem": "2.56.6"
+    "viem": "2.56.9"
   },
   "devDependencies": {
-    "@types/node": "26.6.0",
+    "@types/node": "26.6.3",
     "@types/pg": "8.23.1",
     "typescript": "7.0.2",
-    "vitest": "5.0.1"
+    "vitest": "5.0.2"
   }
 }
